@@ -2,8 +2,7 @@
 
 import axios from 'axios';
 
-const DIRECT_API_URL = 'https://www.ndosiautomation.co.za/EDENDALESPORTSPROJECTNPC/api';
-const PROXY_API_URL = '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 /**
  * Make API request with automatic fallback from proxy to direct
@@ -20,38 +19,19 @@ export const makeApiRequest = async (
     ...headers,
   };
 
-  // First try with proxy
+  // Always use API_BASE_URL (proxy in dev, direct in prod)
   try {
-    console.log(`Trying proxy request: ${method} ${PROXY_API_URL}${endpoint}`);
     const response = await axios({
       method,
-      url: `${PROXY_API_URL}${endpoint}`,
+      url: `${API_BASE_URL}${endpoint}`,
       data,
       headers: defaultHeaders,
-      timeout: 10000,
+      timeout: 15000,
     });
     return response;
-  } catch (proxyError: any) {
-    console.log('Proxy request failed, trying direct API call:', proxyError?.message || proxyError);
-    
-    // Fallback to direct API call
-    try {
-      console.log(`Trying direct request: ${method} ${DIRECT_API_URL}${endpoint}`);
-      const response = await axios({
-        method,
-        url: `${DIRECT_API_URL}${endpoint}`,
-        data,
-        headers: defaultHeaders,
-        timeout: 15000,
-      });
-      return response;
-    } catch (directError: any) {
-      console.error('Both proxy and direct API calls failed:', {
-        proxy: proxyError?.message || proxyError,
-        direct: directError?.message || directError,
-      });
-      throw directError;
-    }
+  } catch (error: any) {
+    console.error('API call failed:', error?.message || error);
+    throw error;
   }
 };
 
