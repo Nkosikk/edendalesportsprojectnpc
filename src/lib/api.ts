@@ -1,8 +1,12 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import toast from 'react-hot-toast';
 
-// API Configuration
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://www.ndosiautomation.co.za/EDENDALESPORTSPROJECTNPC/api';
+// API Configuration  
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (
+  import.meta.env.DEV 
+    ? '/api' 
+    : 'https://www.ndosiautomation.co.za/EDENDALESPORTSPROJECTNPC/api'
+);
 
 // Create axios instance
 export const apiClient: AxiosInstance = axios.create({
