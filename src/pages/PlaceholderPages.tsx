@@ -22,6 +22,8 @@ const RegisterPage = () => {
   const password = watch('password');
 
   const onSubmit = async (data: RegisterRequest & { confirmPassword: string }) => {
+    if (loading) return; // Prevent multiple submissions
+    
     try {
       setLoading(true);
       // Remove confirmPassword and format phone number before sending to API
