@@ -9,6 +9,7 @@ import { RegisterRequest } from '../types';
 const RegisterPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const { register: registerUser } = useAuth();
   const navigate = useNavigate();
 
@@ -23,12 +24,11 @@ const RegisterPage = () => {
 
   const onSubmit = async (data: RegisterRequest & { confirmPassword: string }) => {
     if (loading) return; // Prevent multiple submissions
-    
+    setFormError(null);
     try {
       setLoading(true);
       // Remove confirmPassword and format phone number before sending to API
       const { confirmPassword, ...registerData } = data;
-      
       // Format phone number: remove leading 0 if present, then add +27
       if (registerData.phone) {
         const cleanPhone = registerData.phone.startsWith('0') 
@@ -36,11 +36,12 @@ const RegisterPage = () => {
           : registerData.phone;
         registerData.phone = `+27${cleanPhone}`;
       }
-      
       await registerUser(registerData);
       navigate('/app');
-    } catch (error) {
-      // Error is handled by the auth context
+    } catch (error: any) {
+      // Show backend error message if available
+      const message = error?.response?.data?.message || error?.message || 'Registration failed';
+      setFormError(message);
     } finally {
       setLoading(false);
     }
@@ -70,6 +71,11 @@ const RegisterPage = () => {
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
+          {formError && (
+            <div className="mb-4 text-sm text-error-600 bg-error-100 p-2 rounded">
+              {formError}
+            </div>
+          )}
           <div className="space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>

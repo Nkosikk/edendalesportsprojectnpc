@@ -1,8 +1,8 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import toast from 'react-hot-toast';
 
-// API Configuration - Direct to production API only
-const API_BASE_URL = 'https://www.ndosiautomation.co.za/EDENDALESPORTSPROJECTNPC/api';
+// API Configuration - Use proxy to avoid CORS issues
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // Create axios instance
 export const apiClient: AxiosInstance = axios.create({
@@ -78,13 +78,17 @@ apiClient.interceptors.response.use(
     }
 
     // Handle other errors
-    const errorMessage = error.response?.data?.message || 'An error occurred';
-    
+    // Only show error toast if not a handled success (status not 2xx or success false)
+    const isSuccess = error.response?.data?.success;
+    const status = error.response?.status;
+    const message = error.response?.data?.message;
+    const errorMessage = message || 'An error occurred';
     // Don't show toast for 401 errors as we handle them above
-    if (error.response?.status !== 401) {
+    const isRegistrationSuccess =
+      status >= 200 && status < 300 && isSuccess && message && message.toLowerCase().includes('registration successful');
+    if (status !== 401 && !isRegistrationSuccess && !(status >= 200 && status < 300 && isSuccess)) {
       toast.error(errorMessage);
     }
-
     return Promise.reject(error);
   }
 );
@@ -92,6 +96,10 @@ apiClient.interceptors.response.use(
 // API response wrapper
 export const handleApiResponse = <T>(response: AxiosResponse): T => {
   if (response.data.success) {
+    // If a message is present, show it as a toast (for registration, etc.)
+    if (response.data.message) {
+      toast.success(response.data.message);
+    }
     return response.data.data;
   } else {
     throw new Error(response.data.message || 'API request failed');
