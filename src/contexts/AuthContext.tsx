@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, AuthTokens, LoginRequest, RegisterRequest, ApiResponse } from '../types';
+import { User, LoginRequest, RegisterRequest, ApiResponse, AuthResponse } from '../types';
 import { apiClient, handleApiResponse } from '../lib/api';
-import { apiPost } from '../utils/apiUtils';
 import toast from 'react-hot-toast';
 
 interface AuthContextType {
@@ -47,7 +46,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           // Token invalid, clear storage
           localStorage.removeItem('user');
           localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
+          // no refresh token in current API
         }
       }
       setLoading(false);
@@ -59,19 +58,22 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const login = async (credentials: LoginRequest) => {
     try {
       setLoading(true);
-      const response = await apiClient.post<ApiResponse<{ user: User; tokens: AuthTokens }>>(
+      // Use absolute path to backend (CORS enabled)
+      const response = await apiClient.post<AuthResponse>(
         '/auth/login',
-        credentials
+        {
+          email: credentials.email,
+          password: credentials.password,
+        }
       );
-      
-      const responseData = handleApiResponse(response);
-      const { user: userData, tokens } = responseData as { user: User; tokens: AuthTokens };
-      
-      // Store tokens and user data
-      localStorage.setItem('accessToken', tokens.accessToken);
-      localStorage.setItem('refreshToken', tokens.refreshToken);
+
+      if (!response.data.success) throw new Error('Login failed');
+      const { user: userData, token } = response.data.data;
+
+      // Store token and user data
+      localStorage.setItem('accessToken', token);
       localStorage.setItem('user', JSON.stringify(userData));
-      
+
       setUser(userData);
       toast.success('Login successful!');
     } catch (error: any) {
@@ -88,14 +90,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setLoading(true);
       // Automatically set role to customer for all registrations
       const registrationData = { ...userData, role: 'customer' };
-      const response = await apiPost('/auth/register', registrationData);
-      
-      const responseData = handleApiResponse(response);
-      const { user: newUser, tokens } = responseData as { user: User; tokens: AuthTokens };
-      
-      // Store tokens and user data
-      localStorage.setItem('accessToken', tokens.accessToken);
-      localStorage.setItem('refreshToken', tokens.refreshToken);
+      const response = await apiClient.post<AuthResponse>('/auth/register', registrationData);
+      if (!response.data.success) throw new Error('Registration failed');
+      const { user: newUser, token } = response.data.data;
+
+      // Store token and user data
+      localStorage.setItem('accessToken', token);
       localStorage.setItem('user', JSON.stringify(newUser));
       
       setUser(newUser);
@@ -113,7 +113,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setUser(null);
     localStorage.removeItem('user');
     localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+    // no refresh token in current API
     toast.success('Logged out successfully');
   };
 

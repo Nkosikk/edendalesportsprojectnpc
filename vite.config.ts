@@ -5,6 +5,8 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // Store Vite's cache outside node_modules to avoid EACCES issues
+  cacheDir: '.vite',
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

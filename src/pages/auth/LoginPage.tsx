@@ -12,8 +12,10 @@ const LoginPage = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-
-  const from = location.state?.from?.pathname || '/app';
+  // Preserve full redirect path (pathname + search) if present
+  const fromPathname: string | undefined = location.state?.from?.pathname;
+  const fromSearch: string | undefined = location.state?.from?.search;
+  const from = fromPathname ? `${fromPathname}${fromSearch || ''}` : '/app';
 
   const {
     register,

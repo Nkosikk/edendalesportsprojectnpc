@@ -17,17 +17,13 @@ const Header = () => {
     setIsProfileOpen(false);
   };
 
-  const navigation = isAuthenticated
-    ? [
-        { name: 'Dashboard', href: '/app', icon: Home },
-        { name: 'Bookings', href: '/app/bookings', icon: Calendar },
-        ...(user?.role === 'ADMIN' ? [
-          { name: 'Admin', href: '/admin', icon: Settings },
-        ] : []),
-      ]
-    : [
-        { name: 'Home', href: '/', icon: Home },
-      ];
+  const navigation = isAuthenticated ? [
+    { name: 'Dashboard', href: '/app', icon: Home },
+    { name: 'Bookings', href: '/app/bookings', icon: Calendar },
+    ...(user?.role === 'admin' ? [
+      { name: 'Admin', href: '/admin', icon: Settings },
+    ] : []),
+  ] : [];
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
@@ -73,10 +69,10 @@ const Header = () => {
                 >
                   <div className="h-8 w-8 bg-gray-300 rounded-full flex items-center justify-center">
                     <span className="text-sm font-medium">
-                      {user?.firstName?.charAt(0)}{user?.lastName?.charAt(0)}
+                      {user?.first_name?.charAt(0)}{user?.last_name?.charAt(0)}
                     </span>
                   </div>
-                  <span className="text-sm font-medium">{user?.firstName}</span>
+                  <span className="text-sm font-medium">{user?.first_name}</span>
                 </button>
 
                 {isProfileOpen && (
@@ -102,15 +98,32 @@ const Header = () => {
                 )}
               </div>
             ) : (
-              <div className="flex items-center space-x-4">
-                <Link to="/login">
-                  <Button variant="outline" size="sm">
-                    Login
-                  </Button>
+              <div className="flex items-center space-x-2">
+                <Link
+                  to="/"
+                  className={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                    location.pathname === '/'
+                      ? 'bg-primary-100 text-primary-700'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <Home className="h-4 w-4 mr-1" />
+                  Home
                 </Link>
                 <Link to="/register">
-                  <Button variant="primary" size="sm">
+                  <Button 
+                    variant={location.pathname === '/register' ? 'primary' : 'outline'} 
+                    size="sm"
+                  >
                     Register
+                  </Button>
+                </Link>
+                <Link to="/login">
+                  <Button 
+                    variant={location.pathname === '/login' ? 'primary' : 'outline'} 
+                    size="sm"
+                  >
+                    Login
                   </Button>
                 </Link>
               </div>
@@ -175,21 +188,37 @@ const Header = () => {
                 ) : (
                   <div className="space-y-2">
                     <Link
-                      to="/login"
-                      className="block w-full"
+                      to="/"
+                      className="flex items-center px-3 py-2 rounded-md text-base font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                       onClick={() => setIsMenuOpen(false)}
                     >
-                      <Button variant="outline" size="sm" className="w-full">
-                        Login
-                      </Button>
+                      <Home className="h-5 w-5 mr-3" />
+                      Home
                     </Link>
                     <Link
                       to="/register"
                       className="block w-full"
                       onClick={() => setIsMenuOpen(false)}
                     >
-                      <Button variant="primary" size="sm" className="w-full">
+                      <Button 
+                        variant={location.pathname === '/register' ? 'primary' : 'outline'} 
+                        size="sm" 
+                        className="w-full"
+                      >
                         Register
+                      </Button>
+                    </Link>
+                    <Link
+                      to="/login"
+                      className="block w-full"
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <Button 
+                        variant={location.pathname === '/login' ? 'primary' : 'outline'} 
+                        size="sm" 
+                        className="w-full"
+                      >
+                        Login
                       </Button>
                     </Link>
                   </div>

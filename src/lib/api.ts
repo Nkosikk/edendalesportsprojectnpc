@@ -1,8 +1,12 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import toast from 'react-hot-toast';
 
-// API Configuration - Use proxy to avoid CORS issues
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+// API Configuration
+// In development, use Vite proxy at '/api' to avoid CORS.
+// In production, call the real backend URL directly.
+const API_BASE_URL = import.meta.env.MODE === 'development'
+  ? '/api'
+  : 'https://www.ndosiautomation.co.za/EDENDALESPORTSPROJECTNPC/api';
 
 // Create axios instance
 export const apiClient: AxiosInstance = axios.create({
@@ -37,37 +41,14 @@ apiClient.interceptors.response.use(
   async (error) => {
     const originalRequest = error.config;
 
-    // Handle 401 errors (unauthorized)
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
-      
-      const refreshToken = localStorage.getItem('refreshToken');
-      if (refreshToken) {
-        try {
-          const response = await axios.post('/api/auth/refresh', {
-            refreshToken,
-          });
-          
-          const { accessToken } = response.data.data;
-          localStorage.setItem('accessToken', accessToken);
-          
-          // Retry original request with new token
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-          return apiClient(originalRequest);
-        } catch (refreshError) {
-          // Refresh failed, redirect to login
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('user');
-          window.location.href = '/login';
-        }
-      } else {
-        // No refresh token, redirect to login
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeValue('user');
-        window.location.href = '/login';
-      }
+    // Handle 401 errors (unauthorized) - no refresh flow in backend
+    if (error.response?.status === 401 && !originalRequest?._retry) {
+      if (originalRequest) originalRequest._retry = true;
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('user');
+      // Redirect to login
+      window.location.href = '/login';
+      return Promise.reject(error);
     }
 
     // Handle CORS errors specifically

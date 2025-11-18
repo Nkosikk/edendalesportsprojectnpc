@@ -9,16 +9,21 @@ import HomePage from './pages/HomePage'
 import LoginPage from './pages/auth/LoginPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import BookingsPage from './pages/bookings/BookingsPage'
+import BookingDetailsPage from './pages/bookings/BookingDetailsPage'
+import FieldAvailabilityPage from './pages/fields/FieldAvailabilityPage'
+import PaymentStatusPage from './pages/payments/PaymentStatusPage'
 import { 
   RegisterPage, 
-  BookingDetailsPage, 
   CreateBookingPage, 
   ProfilePage, 
-  AdminDashboardPage, 
-  FieldManagementPage, 
-  UserManagementPage, 
   NotFoundPage 
 } from './pages/PlaceholderPages'
+import AdminDashboardPage from './pages/admin/AdminDashboardPage'
+import UsersManagementPage from './pages/admin/UsersManagementPage'
+import FieldsManagementPage from './pages/admin/FieldsManagementPage'
+import BookingsManagementPage from './pages/admin/BookingsManagementPage'
+import ReportsRevenuePage from './pages/admin/ReportsRevenuePage'
+import ReportsAnalyticsPage from './pages/admin/ReportsAnalyticsPage'
 
 function App() {
   const { loading } = useAuth()
@@ -47,13 +52,18 @@ function App() {
         <Route path="bookings/:id" element={<BookingDetailsPage />} />
         <Route path="bookings/new" element={<CreateBookingPage />} />
         <Route path="profile" element={<ProfilePage />} />
+        <Route path="availability" element={<FieldAvailabilityPage />} />
+        <Route path="payments/status" element={<PaymentStatusPage />} />
       </Route>
 
       {/* Admin Routes */}
-      <Route path="/admin" element={<ProtectedRoute roles={['ADMIN']}><Layout /></ProtectedRoute>}>
+      <Route path="/admin" element={<ProtectedRoute roles={['admin']}><Layout /></ProtectedRoute>}>
         <Route index element={<AdminDashboardPage />} />
-        <Route path="fields" element={<FieldManagementPage />} />
-        <Route path="users" element={<UserManagementPage />} />
+        <Route path="bookings" element={<BookingsManagementPage />} />
+        <Route path="fields" element={<FieldsManagementPage />} />
+        <Route path="users" element={<UsersManagementPage />} />
+        <Route path="reports/revenue" element={<ReportsRevenuePage />} />
+        <Route path="reports/analytics" element={<ReportsAnalyticsPage />} />
       </Route>
 
       {/* 404 Route */}

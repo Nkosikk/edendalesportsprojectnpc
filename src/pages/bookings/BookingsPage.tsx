@@ -1,36 +1,34 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Clock, MapPin, Plus, Filter } from 'lucide-react';
+import { Calendar, Clock, Plus, Filter } from 'lucide-react';
 import { useQuery } from 'react-query';
 import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { bookingService } from '../../services/bookingService';
+import type { BookingDetails } from '../../types';
 import { formatDate, formatTime, formatCurrency } from '../../lib/utils';
+import PayButton from '../../components/payments/PayButton';
 
 const BookingsPage = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   
-  const { data: bookingsData, isLoading, error } = useQuery(
+  const { data: bookings, isLoading, error } = useQuery<BookingDetails[]>(
     ['bookings', statusFilter],
-    () => bookingService.getMyBookings({
-      status: statusFilter === 'all' ? undefined : statusFilter
+    () => bookingService.getBookings({
+      status: statusFilter === 'all' ? undefined : (statusFilter.toLowerCase() as any),
     }),
-    {
-      retry: 1,
-    }
+    { retry: 1 }
   );
-
-  const bookings = bookingsData?.content || [];
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'CONFIRMED':
+      case 'confirmed':
         return 'bg-success-100 text-success-800';
-      case 'PENDING':
+      case 'pending':
         return 'bg-warning-100 text-warning-800';
-      case 'CANCELLED':
+      case 'cancelled':
         return 'bg-error-100 text-error-800';
-      case 'COMPLETED':
+      case 'completed':
         return 'bg-gray-100 text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800';
@@ -70,7 +68,7 @@ const BookingsPage = () => {
             <span className="text-sm font-medium text-gray-700">Filter by status:</span>
           </div>
           <div className="flex flex-wrap gap-2">
-            {['all', 'PENDING', 'CONFIRMED', 'COMPLETED', 'CANCELLED'].map((status) => (
+            {['all', 'pending', 'confirmed', 'completed', 'cancelled'].map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
@@ -93,7 +91,7 @@ const BookingsPage = () => {
               <p className="text-error-600">Failed to load bookings. Please try again later.</p>
             </div>
           </div>
-        ) : bookings.length === 0 ? (
+        ) : (bookings?.length || 0) === 0 ? (
           <div className="text-center py-12">
             <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No bookings found</h3>
@@ -108,31 +106,27 @@ const BookingsPage = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {bookings.map((booking) => (
+            {(bookings || []).map((booking) => (
               <div key={booking.id} className="card hover:shadow-lg transition-shadow">
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                      {booking.field?.name || 'Field Name'}
+                      {booking.field_name}
                     </h3>
-                    <div className="flex items-center text-sm text-gray-500">
-                      <MapPin className="h-4 w-4 mr-1" />
-                      {booking.field?.location || 'Location'}
-                    </div>
                   </div>
                   <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(booking.status)}`}>
-                    {booking.status}
+                    {booking.status.toUpperCase()}
                   </span>
                 </div>
 
                 <div className="space-y-2 mb-4">
                   <div className="flex items-center text-sm text-gray-600">
                     <Calendar className="h-4 w-4 mr-2" />
-                    {formatDate(booking.startDateTime)}
+                    {formatDate(booking.booking_date)}
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
                     <Clock className="h-4 w-4 mr-2" />
-                    {formatTime(booking.startDateTime)} - {formatTime(booking.endDateTime)}
+                    {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
                   </div>
                 </div>
 
@@ -140,7 +134,7 @@ const BookingsPage = () => {
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-gray-500">Total Amount</span>
                     <span className="text-lg font-semibold text-gray-900">
-                      {formatCurrency(booking.totalAmount)}
+                      {formatCurrency(booking.total_amount)}
                     </span>
                   </div>
                   <div className="flex space-x-2">
@@ -149,7 +143,10 @@ const BookingsPage = () => {
                         View Details
                       </Button>
                     </Link>
-                    {booking.status === 'PENDING' && (
+                    {booking.status === 'pending' && (
+                      <PayButton bookingId={booking.id} label="Pay" />
+                    )}
+                    {booking.status === 'pending' && (
                       <Button
                         variant="error"
                         size="sm"
@@ -169,14 +166,15 @@ const BookingsPage = () => {
         )}
 
         {/* Pagination */}
-        {bookingsData && bookingsData.totalPages > 1 && (
+        {/* In current API, bookings list is not paginated */}
+        {false && (
           <div className="mt-8 flex justify-center">
             <div className="flex space-x-2">
               <Button variant="outline" size="sm" disabled>
                 Previous
               </Button>
               <span className="px-3 py-2 text-sm text-gray-600">
-                Page 1 of {bookingsData.totalPages}
+                Page 1 of 1
               </span>
               <Button variant="outline" size="sm" disabled>
                 Next
