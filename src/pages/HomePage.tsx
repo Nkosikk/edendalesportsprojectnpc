@@ -11,7 +11,6 @@ const HomePage = () => {
   const navigate = useNavigate();
   const [fields, setFields] = useState<SportsField[]>([]);
   const [loadingFields, setLoadingFields] = useState<boolean>(true);
-  const [fieldsError, setFieldsError] = useState<string | null>(null);
   const [allFieldsFallback, setAllFieldsFallback] = useState<boolean>(false);
 
   // Booking widget state
@@ -45,7 +44,6 @@ const HomePage = () => {
     const load = async () => {
       try {
         setLoadingFields(true);
-        setFieldsError(null);
         let data = await fieldService.getAllFields(true);
         // If no active fields found, fall back to all fields (admin may not have activated yet)
         if (!data || data.length === 0) {
