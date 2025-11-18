@@ -19,7 +19,7 @@ export const fieldService = {
     const response = await apiClient.get<ApiResponse<SportsField[]>>('/fields', {
       params: { active_only: activeOnly },
     });
-    return handleApiResponse<SportsField[]>(response);
+    return handleApiResponse<SportsField[]>(response, false);
   },
 
   /**
@@ -27,7 +27,7 @@ export const fieldService = {
    */
   getFieldById: async (id: number): Promise<SportsField> => {
     const response = await apiClient.get<ApiResponse<SportsField>>(`/fields/${id}`);
-    return handleApiResponse<SportsField>(response);
+    return handleApiResponse<SportsField>(response, false);
   },
 
   /**
@@ -44,7 +44,7 @@ export const fieldService = {
         params: { date, duration },
       }
     );
-    return handleApiResponse<FieldAvailability>(response);
+    return handleApiResponse<FieldAvailability>(response, false);
   },
 
   /**
@@ -52,7 +52,7 @@ export const fieldService = {
    */
   createField: async (data: CreateFieldRequest): Promise<SportsField> => {
     const response = await apiClient.post<ApiResponse<SportsField>>('/fields', data);
-    return handleApiResponse<SportsField>(response);
+    return handleApiResponse<SportsField>(response, true); // Show success for field creation
   },
 
   /**
@@ -60,7 +60,7 @@ export const fieldService = {
    */
   updateField: async (id: number, data: Partial<CreateFieldRequest>): Promise<SportsField> => {
     const response = await apiClient.put<ApiResponse<SportsField>>(`/fields/${id}`, data);
-    return handleApiResponse<SportsField>(response);
+    return handleApiResponse<SportsField>(response, true); // Show success for field update
   },
 
   /**
@@ -68,7 +68,7 @@ export const fieldService = {
    */
   deleteField: async (id: number): Promise<void> => {
     const response = await apiClient.delete<ApiResponse>(`/fields/${id}`);
-    return handleApiResponse<void>(response);
+    return handleApiResponse<void>(response, true); // Show success for field deletion
   },
 
   /**
@@ -76,7 +76,7 @@ export const fieldService = {
    */
   activateField: async (id: number): Promise<SportsField> => {
     const response = await apiClient.put<ApiResponse<SportsField>>(`/fields/${id}/activate`);
-    return handleApiResponse<SportsField>(response);
+    return handleApiResponse<SportsField>(response, true); // Show success for field activation
   },
 
   /**
@@ -84,7 +84,7 @@ export const fieldService = {
    */
   deactivateField: async (id: number): Promise<SportsField> => {
     const response = await apiClient.put<ApiResponse<SportsField>>(`/fields/${id}/deactivate`);
-    return handleApiResponse<SportsField>(response);
+    return handleApiResponse<SportsField>(response, true); // Show success for field deactivation
   },
 };
 

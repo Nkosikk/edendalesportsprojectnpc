@@ -57,7 +57,7 @@ export const authService = {
    */
   async verifyToken(): Promise<User> {
     const response = await apiClient.get<ApiResponse<{ user: User }>>('/auth/verify');
-    return handleApiResponse<{ user: User }>(response).user;
+    return handleApiResponse<{ user: User }>(response, false).user;
   },
 
   /**

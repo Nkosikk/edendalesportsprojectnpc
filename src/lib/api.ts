@@ -75,10 +75,10 @@ apiClient.interceptors.response.use(
 );
 
 // API response wrapper
-export const handleApiResponse = <T>(response: AxiosResponse): T => {
+export const handleApiResponse = <T>(response: AxiosResponse, showSuccessToast: boolean = false): T => {
   if (response.data.success) {
-    // If a message is present, show it as a toast (for registration, etc.)
-    if (response.data.message) {
+    // Only show success toast when explicitly requested (for important actions like registration, login, etc.)
+    if (showSuccessToast && response.data.message) {
       toast.success(response.data.message);
     }
     return response.data.data;
