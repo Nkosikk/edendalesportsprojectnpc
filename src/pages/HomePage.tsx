@@ -116,7 +116,7 @@ const HomePage = () => {
                       <option value="">Select Field</option>
                       {fields.map((f) => (
                         <option key={f.id} value={f.id}>
-                          {f.name} ({f.sport_type})
+                          {f.name}
                         </option>
                       ))}
                     </select>

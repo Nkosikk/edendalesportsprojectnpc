@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, User, LogOut, Settings, Calendar, Home } from 'lucide-react';
+import { Menu, X, User, LogOut, Settings, Calendar, Home, Users, Building, BarChart3, FileText } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../ui/Button';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const { user, logout, isAuthenticated } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -20,10 +21,16 @@ const Header = () => {
   const navigation = isAuthenticated ? [
     { name: 'Dashboard', href: '/app', icon: Home },
     { name: 'Bookings', href: '/app/bookings', icon: Calendar },
-    ...(user?.role === 'admin' ? [
-      { name: 'Admin', href: '/admin', icon: Settings },
-    ] : []),
   ] : [];
+
+  const adminNavigation = [
+    { name: 'Dashboard', href: '/admin', icon: BarChart3 },
+    { name: 'Users', href: '/admin/users', icon: Users },
+    { name: 'Bookings', href: '/admin/bookings', icon: Calendar },
+    { name: 'Fields', href: '/admin/fields', icon: Building },
+    { name: 'Revenue', href: '/admin/reports/revenue', icon: FileText },
+    { name: 'Analytics', href: '/admin/reports/analytics', icon: BarChart3 },
+  ];
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
@@ -57,6 +64,38 @@ const Header = () => {
                 {item.name}
               </Link>
             ))}
+            {user?.role === 'admin' && (
+              <div className="relative">
+                <button
+                  onClick={() => setIsAdminOpen(!isAdminOpen)}
+                  className={`inline-flex items-center px-1 pt-1 text-sm font-medium transition-colors ${
+                    location.pathname.startsWith('/admin')
+                      ? 'text-primary-600 border-b-2 border-primary-600'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <Settings className="h-4 w-4 mr-2" />
+                  Admin
+                </button>
+                {isAdminOpen && (
+                  <div className="absolute left-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 z-50">
+                    <div className="py-1">
+                      {adminNavigation.map((item) => (
+                        <Link
+                          key={item.name}
+                          to={item.href}
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                          onClick={() => setIsAdminOpen(false)}
+                        >
+                          <item.icon className="h-4 w-4 mr-2" />
+                          {item.name}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </nav>
 
           {/* Desktop Auth */}
@@ -164,6 +203,26 @@ const Header = () => {
                   {item.name}
                 </Link>
               ))}
+              {user?.role === 'admin' && (
+                <div className="border-t border-gray-200 pt-2 mt-2">
+                  <div className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase tracking-wide">Admin</div>
+                  {adminNavigation.map((item) => (
+                    <Link
+                      key={item.name}
+                      to={item.href}
+                      className={`flex items-center px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                        location.pathname === item.href
+                          ? 'text-primary-600 bg-primary-50'
+                          : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                      }`}
+                      onClick={() => setIsMenuOpen(false)}
+                    >
+                      <item.icon className="h-5 w-5 mr-3" />
+                      {item.name}
+                    </Link>
+                  ))}
+                </div>
+              )}
               
               {/* Mobile Auth */}
               <div className="border-t border-gray-200 pt-4">

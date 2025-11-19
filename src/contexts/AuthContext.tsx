@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, LoginRequest, RegisterRequest, ApiResponse, AuthResponse } from '../types';
+import { User, UserRole, LoginRequest, RegisterRequest, ApiResponse, AuthResponse } from '../types';
 import { apiClient, handleApiResponse } from '../lib/api';
 import toast from 'react-hot-toast';
 
@@ -11,6 +11,8 @@ interface AuthContextType {
   updateProfile: (userData: Partial<User>) => Promise<void>;
   loading: boolean;
   isAuthenticated: boolean;
+  hasRole: (...roles: UserRole[]) => boolean;
+  requireRole: (roles: UserRole[]) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -132,6 +134,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
+  const hasRole = (...roles: UserRole[]) => {
+    if (!user) return false;
+    return roles.includes(user.role as UserRole);
+  };
+
+  const requireRole = (roles: UserRole[]) => {
+    return hasRole(...roles);
+  };
+
   const value: AuthContextType = {
     user,
     login,
@@ -140,6 +151,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     updateProfile,
     loading,
     isAuthenticated: !!user,
+    hasRole,
+    requireRole,
   };
 
   return (

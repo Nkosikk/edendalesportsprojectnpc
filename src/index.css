@@ -47,6 +47,13 @@
   .input {
     @apply w-full px-3 py-2 border border-gray-300 rounded-lg text-sm placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
   }
+  /* Compact input for dense forms */
+  .input-compact {
+    @apply px-2 py-1 text-xs;
+  }
+  .label-compact {
+    @apply text-xs mb-0.5;
+  }
   
   .label {
     @apply block text-sm font-medium text-gray-700 mb-1;

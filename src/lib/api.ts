@@ -2,11 +2,8 @@ import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import toast from 'react-hot-toast';
 
 // API Configuration
-// In development, use Vite proxy at '/api' to avoid CORS.
-// In production, call the real backend URL directly.
-const API_BASE_URL = import.meta.env.MODE === 'development'
-  ? '/api'
-  : 'https://www.ndosiautomation.co.za/EDENDALESPORTSPROJECTNPC/api';
+// Use the real backend URL directly (supports CORS)
+const API_BASE_URL = 'https://www.ndosiautomation.co.za/EDENDALESPORTSPROJECTNPC/api';
 
 // Create axios instance
 export const apiClient: AxiosInstance = axios.create({
@@ -23,7 +20,10 @@ export const apiClient: AxiosInstance = axios.create({
 apiClient.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('accessToken');
-    if (token) {
+    // Do not attach Authorization for login/register endpoints
+    const path = (config.url || '').toLowerCase();
+    const isAuthEndpoint = path.includes('/auth/login') || path.includes('/auth/register');
+    if (token && !isAuthEndpoint) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;

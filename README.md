@@ -7,8 +7,10 @@ A modern React TypeScript frontend application for the Edendale Sports Projects 
 - **Modern UI**: Built with React 18 and TypeScript for type safety
 - **Responsive Design**: Fully responsive design using Tailwind CSS
 - **Authentication**: Secure JWT-based authentication system
-- **Booking Management**: Complete booking lifecycle management
-- **Admin Dashboard**: Comprehensive admin panel for field and user management
+- **Booking Management**: Create, modify, cancel bookings with hourly costing (R400/h)
+- **Field Management**: Admin can create/edit/activate/deactivate fields
+- **Slot Blocking**: Maintenance/event slot blocking per field/date/hour
+- **Admin Dashboard**: KPIs, recent bookings, revenue timeline
 - **Real-time Updates**: Live booking status updates
 - **Mobile Friendly**: Optimized for mobile and tablet devices
 
@@ -124,10 +126,12 @@ The frontend integrates with the Edendale Sports Projects NPC backend API:
 - `POST /auth/login` - User authentication
 - `POST /auth/register` - User registration  
 - `GET /fields` - Get available fields
-- `POST /bookings` - Create new booking
-- `GET /bookings/my` - Get user's bookings
-- `PUT /bookings/{id}` - Update booking
+- `POST /bookings` - Create new booking (auto cost R400/h unless field rate differs)
+- `PUT /bookings/{id}` - Update booking (reschedule)
 - `DELETE /bookings/{id}` - Cancel booking
+- `POST /admin/block-slot` / `POST /admin/unblock-slot` - Maintenance/event management
+- `GET /reports/revenue` - Revenue breakdown & payment methods
+- `GET /reports/analytics` - Booking analytics (peak hours, trends)
 
 ## 🎨 UI Components
 

@@ -14,16 +14,21 @@ const FieldAvailabilityPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [loadingFields, setLoadingFields] = useState<boolean>(true);
 
+  const loadFields = async () => {
+    try {
+      setLoadingFields(true);
+      const data = await fieldService.getAllFields(true);
+      console.log('Loaded fields (active only):', data);
+      setFields(data);
+    } catch (error) {
+      console.error('Failed to load fields:', error);
+      setFields([]); // Set empty array on error
+    } finally {
+      setLoadingFields(false);
+    }
+  };
+
   useEffect(() => {
-    const loadFields = async () => {
-      try {
-        setLoadingFields(true);
-        const data = await fieldService.getAllFields(true);
-        setFields(data);
-      } finally {
-        setLoadingFields(false);
-      }
-    };
     loadFields();
   }, []);
 
@@ -58,9 +63,14 @@ const FieldAvailabilityPage: React.FC = () => {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Check Field Availability</h1>
-        <p className="text-gray-600">Select a field, date, and duration to view available time slots.</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Check Field Availability</h1>
+          <p className="text-gray-600">Select a field, date, and duration to view available time slots.</p>
+        </div>
+        <Button variant="outline" onClick={loadFields} disabled={loadingFields}>
+          {loadingFields ? 'Loading...' : 'Refresh Fields'}
+        </Button>
       </div>
 
       <Card className="mb-6">
@@ -71,18 +81,28 @@ const FieldAvailabilityPage: React.FC = () => {
               {loadingFields ? (
                 <div className="h-10 flex items-center"><LoadingSpinner size="sm" /></div>
               ) : (
-                <select
-                  value={selectedFieldId}
-                  onChange={(e) => setSelectedFieldId(e.target.value ? Number(e.target.value) : '')}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">Select Field</option>
-                  {fields.map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name} ({f.sport_type})
-                    </option>
-                  ))}
-                </select>
+                <>
+                  <select
+                    value={selectedFieldId}
+                    onChange={(e) => setSelectedFieldId(e.target.value ? Number(e.target.value) : '')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">Select Field</option>
+                    {fields.map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name} ({f.sport_type})
+                      </option>
+                    ))}
+                  </select>
+                  {fields.length === 0 && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-red-600 mt-1">No fields available. Please check back later.</p>
+                      <Button size="sm" variant="outline" onClick={loadFields} className="mt-1">
+                        Refresh
+                      </Button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
             <div>

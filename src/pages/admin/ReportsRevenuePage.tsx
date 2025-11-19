@@ -3,6 +3,10 @@ import { reportService } from '../../services/reportService';
 import type { RevenueReport, ReportFilters } from '../../types';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import BookingOverview from '../../components/admin/BookingOverview';
+import PaymentMethodsPie from '../../components/admin/charts/PaymentMethodsPie';
+import RevenueTimelineLine from '../../components/admin/charts/RevenueTimelineLine';
+import Button from '../../components/ui/Button';
 
 const ReportsRevenuePage: React.FC = () => {
   const [filters, setFilters] = useState<ReportFilters>({});
@@ -50,6 +54,9 @@ const ReportsRevenuePage: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
               <input type="date" className="px-3 py-2 border rounded-lg w-full" value={filters.to_date || ''} onChange={(e) => setFilters({ ...filters, to_date: e.target.value || undefined })} />
             </div>
+            <div className="flex items-end">
+              <Button size="sm" variant="outline" onClick={() => report && reportService.exportReport({ type: 'revenue', format: 'csv', from_date: filters.from_date, to_date: filters.to_date })}>Export CSV</Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -59,28 +66,28 @@ const ReportsRevenuePage: React.FC = () => {
       ) : (
         <div className="space-y-6">
           <Card>
-            <CardHeader><CardTitle>Summary</CardTitle></CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div><div className="text-gray-600">Total Revenue</div><div className="text-xl font-bold">R {report.overall_stats.total_revenue.toFixed(2)}</div></div>
-                <div><div className="text-gray-600">Total Bookings</div><div className="text-xl font-bold">{report.overall_stats.total_bookings}</div></div>
-                <div><div className="text-gray-600">Average Value</div><div className="text-xl font-bold">R {report.overall_stats.average_booking_value.toFixed(2)}</div></div>
-              </div>
+              <BookingOverview
+                compact
+                metrics={{
+                  total_revenue: report.overall_stats.total_revenue,
+                  total_bookings: report.overall_stats.total_bookings,
+                }}
+              />
             </CardContent>
           </Card>
 
           <Card>
-            <CardHeader><CardTitle>Timeline</CardTitle></CardHeader>
+            <CardHeader><CardTitle>Payment Methods</CardTitle></CardHeader>
             <CardContent>
-              <div className="space-y-2">
-                {report.revenue_timeline.map((p, idx) => (
-                  <div key={idx} className="flex items-center gap-4">
-                    <div className="w-40 text-sm text-gray-600">{p.period}</div>
-                    <div className="flex-1 bg-green-500 h-4 rounded" style={{ width: `${(p.revenue / Math.max(...report.revenue_timeline.map(x => x.revenue))) * 100}%`, minWidth: '10px' }} />
-                    <div className="w-24 text-right font-medium">R {p.revenue.toFixed(2)}</div>
-                  </div>
-                ))}
-              </div>
+              <PaymentMethodsPie data={report.payment_methods} />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle>Revenue Timeline</CardTitle></CardHeader>
+            <CardContent>
+              <RevenueTimelineLine data={report.revenue_timeline} />
             </CardContent>
           </Card>
         </div>

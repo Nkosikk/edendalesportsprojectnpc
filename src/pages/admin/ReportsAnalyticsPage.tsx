@@ -3,6 +3,10 @@ import { reportService } from '../../services/reportService';
 import type { BookingAnalytics, ReportFilters } from '../../types';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import BookingOverview from '../../components/admin/BookingOverview';
+import PeakHoursBar from '../../components/admin/charts/PeakHoursBar';
+import FieldUtilizationBar from '../../components/admin/charts/FieldUtilizationBar';
+import Button from '../../components/ui/Button';
 
 const ReportsAnalyticsPage: React.FC = () => {
   const [filters, setFilters] = useState<ReportFilters>({});
@@ -38,6 +42,9 @@ const ReportsAnalyticsPage: React.FC = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">To</label>
               <input type="date" className="px-3 py-2 border rounded-lg w-full" value={filters.to_date || ''} onChange={(e) => setFilters({ ...filters, to_date: e.target.value || undefined })} />
             </div>
+            <div className="flex items-end">
+              <Button size="sm" variant="outline" onClick={() => analytics && reportService.exportReport({ type: 'bookings', format: 'csv', from_date: filters.from_date, to_date: filters.to_date })}>Export CSV</Button>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -47,28 +54,28 @@ const ReportsAnalyticsPage: React.FC = () => {
       ) : (
         <div className="space-y-6">
           <Card>
-            <CardHeader><CardTitle>Overall Stats</CardTitle></CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div><div className="text-gray-600">Total Bookings</div><div className="text-xl font-bold">{analytics.overall_stats.total_bookings}</div></div>
-                <div><div className="text-gray-600">Total Hours</div><div className="text-xl font-bold">{analytics.overall_stats.total_hours}</div></div>
-                <div><div className="text-gray-600">Total Revenue</div><div className="text-xl font-bold">R {analytics.overall_stats.total_revenue.toFixed(2)}</div></div>
-              </div>
+              <BookingOverview
+                compact
+                metrics={{
+                  total_bookings: analytics.overall_stats.total_bookings,
+                  total_hours: analytics.overall_stats.total_hours,
+                  total_revenue: analytics.overall_stats.total_revenue,
+                }}
+              />
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader><CardTitle>Peak Hours</CardTitle></CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {analytics.peak_hours.slice(0, 10).map((h, idx) => (
-                  <div key={idx} className="flex items-center gap-4">
-                    <div className="w-16 text-sm text-gray-600">{h.hour}:00</div>
-                    <div className="flex-1 bg-blue-500 h-3 rounded" style={{ width: `${(h.bookings / Math.max(...analytics.peak_hours.map(x => x.bookings))) * 100}%`, minWidth: '10px' }} />
-                    <div className="w-16 text-right text-sm">{h.bookings}</div>
-                  </div>
-                ))}
-              </div>
+              <PeakHoursBar data={analytics.peak_hours} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle>Top Field Utilization</CardTitle></CardHeader>
+            <CardContent>
+              <FieldUtilizationBar data={analytics.field_utilization} />
             </CardContent>
           </Card>
         </div>

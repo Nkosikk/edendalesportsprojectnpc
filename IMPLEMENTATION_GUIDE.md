@@ -1,4 +1,6 @@
 # Edendale Sports Projects NPC - Complete API Implementation Guide
+# Edendale Sports Projects NPC - Complete API Implementation Guide
+# Edendale Sports Projects NPC - Complete API Implementation Guide
 
 ## ✅ COMPLETED IMPLEMENTATIONS
 
@@ -78,7 +80,26 @@ All types have been updated to match the Swagger API documentation exactly:
 
 ## 🚧 REMAINING IMPLEMENTATIONS
 
-### Pages to Create
+### UPDATED PROGRESS (Added)
+
+The following features have been implemented since the previous revision:
+
+- Field creation & editing (`FieldForm.tsx` integrated in `FieldsManagementPage.tsx`)
+- Slot blocking / unblocking UI (`FieldsManagementPage.tsx`)
+- Manual payment confirmation (`BookingsManagementPage.tsx`)
+- Revenue payment method breakdown & CSV export (`ReportsRevenuePage.tsx`)
+- Booking analytics CSV export (`ReportsAnalyticsPage.tsx`)
+- Booking modification (`ModifyBookingPage.tsx` & route)
+
+### Remaining / Next Features
+
+- Enhanced User Management (role modal, activity history)
+- Manual booking creation (admin initiates booking for user)
+- Field utilization statistics (occupancy)
+- Rich charts (use chart library for timelines / peak hours)
+- Multi-day availability calendar view
+- Report export formats: Excel & PDF (CSV done)
+
 
 #### 1. User Management Page
 **File**: `src/pages/admin/UsersManagementPage.tsx`

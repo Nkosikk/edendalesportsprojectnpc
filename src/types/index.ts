@@ -1,12 +1,18 @@
 // ===== Core Domain Types (Matching API Schema) =====
 
+export enum UserRole {
+  Admin = 'admin',
+  Staff = 'staff',
+  Customer = 'customer'
+}
+
 export interface User {
   id: number;
   first_name: string;
   last_name: string;
   email: string;
   phone?: string;
-  role: 'admin' | 'staff' | 'customer';
+  role: UserRole | 'admin' | 'staff' | 'customer';
   is_active: boolean;
   email_verified?: boolean;
   last_login?: string;

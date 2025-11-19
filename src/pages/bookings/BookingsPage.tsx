@@ -8,16 +8,18 @@ import { bookingService } from '../../services/bookingService';
 import type { BookingDetails } from '../../types';
 import { formatDate, formatTime, formatCurrency } from '../../lib/utils';
 import PayButton from '../../components/payments/PayButton';
+import { useAuth } from '../../contexts/AuthContext';
 
 const BookingsPage = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const { user } = useAuth();
   
   const { data: bookings, isLoading, error } = useQuery<BookingDetails[]>(
-    ['bookings', statusFilter],
+    ['bookings', user?.id || 'anon', statusFilter],
     () => bookingService.getBookings({
       status: statusFilter === 'all' ? undefined : (statusFilter.toLowerCase() as any),
     }),
-    { retry: 1 }
+    { retry: 1, enabled: !!user }
   );
 
   const getStatusColor = (status: string) => {

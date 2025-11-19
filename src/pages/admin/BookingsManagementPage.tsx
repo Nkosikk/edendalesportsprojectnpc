@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { adminService } from '../../services/adminService';
+import { paymentService } from '../../services/paymentService';
 import type { BookingDetails, AdminBookingFilters, UpdateBookingStatusRequest } from '../../types';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
@@ -114,6 +115,21 @@ const BookingsManagementPage: React.FC = () => {
                       <Button size="sm" variant="outline" onClick={() => updateStatus(row.id, 'confirmed')}>Confirm</Button>
                       <Button size="sm" variant="outline" onClick={() => updateStatus(row.id, 'completed')}>Complete</Button>
                       <Button size="sm" variant="error" onClick={() => updateStatus(row.id, 'cancelled')}>Cancel</Button>
+                      {row.payment_status === 'pending' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            try {
+                              await paymentService.confirmPayment(undefined, row.id);
+                              toast.success('Payment confirmed');
+                              load();
+                            } catch (e: any) {
+                              toast.error(e?.response?.data?.message || 'Payment confirm failed');
+                            }
+                          }}
+                        >Mark Paid</Button>
+                      )}
                     </div>
                   )
                 },

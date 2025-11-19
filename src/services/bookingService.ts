@@ -36,7 +36,12 @@ export const bookingService = {
    */
   createBooking: async (data: CreateBookingRequest): Promise<BookingDetails> => {
     const response = await apiClient.post<ApiResponse<BookingDetails>>('/bookings', data);
-    return handleApiResponse<BookingDetails>(response);
+    const result = handleApiResponse<BookingDetails>(response);
+    (async () => {
+      const { logAudit } = await import('../lib/audit');
+      logAudit({ action: 'create_booking', entity: 'booking', entityId: result.id, metadata: { field_id: result.field_id, start_time: result.start_time, end_time: result.end_time } });
+    })();
+    return result;
   },
 
   /**
@@ -44,7 +49,12 @@ export const bookingService = {
    */
   updateBooking: async (id: number, data: UpdateBookingRequest): Promise<BookingDetails> => {
     const response = await apiClient.put<ApiResponse<BookingDetails>>(`/bookings/${id}`, data);
-    return handleApiResponse<BookingDetails>(response);
+    const result = handleApiResponse<BookingDetails>(response);
+    (async () => {
+      const { logAudit } = await import('../lib/audit');
+      logAudit({ action: 'update_booking', entity: 'booking', entityId: id, metadata: { changes: data } });
+    })();
+    return result;
   },
 
   /**
@@ -54,6 +64,11 @@ export const bookingService = {
     const response = await apiClient.delete<ApiResponse>(`/bookings/${id}`, {
       data: { reason },
     });
-    return handleApiResponse<void>(response);
+    const result = handleApiResponse<void>(response);
+    (async () => {
+      const { logAudit } = await import('../lib/audit');
+      logAudit({ action: 'cancel_booking', entity: 'booking', entityId: id, metadata: { reason } });
+    })();
+    return result;
   },
 };

@@ -48,18 +48,21 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-4 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-lg w-full space-y-4">
         <div>
           <div className="flex justify-center">
-            <div className="h-16 w-16 bg-primary-600 rounded-xl flex items-center justify-center">
-              <span className="text-white font-bold text-xl">ESP</span>
+            <div className="h-12 w-12 bg-primary-600 rounded-xl flex items-center justify-center">
+              <span className="text-white font-bold text-lg">ESP</span>
             </div>
           </div>
-          <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
+          <h2 className="mt-2 text-center text-xl font-bold text-gray-900">
             Create your account
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="mt-1 text-center text-sm text-gray-700">
+            Join thousands of athletes • Premium facilities • Easy booking
+          </p>
+          <p className="mt-1 text-center text-xs text-gray-600">
             Or{' '}
             <Link
               to="/login"
@@ -70,14 +73,14 @@ const RegisterPage = () => {
           </p>
         </div>
         
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
+        <form className="mt-2 space-y-2" onSubmit={handleSubmit(onSubmit)}>
           {formError && (
-            <div className="mb-4 text-sm text-error-600 bg-error-100 p-2 rounded">
+            <div className="mb-1 text-xs text-error-600 bg-error-100 p-2 rounded">
               {formError}
             </div>
           )}
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="space-y-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
               <div>
                 <label htmlFor="first_name" className="label">
                   First Name
@@ -100,7 +103,7 @@ const RegisterPage = () => {
                   />
                 </div>
                 {errors.first_name && (
-                  <p className="mt-1 text-sm text-error-600">{errors.first_name.message}</p>
+                  <p className="mt-0.5 text-xs text-error-600">{errors.first_name.message}</p>
                 )}
               </div>
 
@@ -126,7 +129,7 @@ const RegisterPage = () => {
                   />
                 </div>
                 {errors.last_name && (
-                  <p className="mt-1 text-sm text-error-600">{errors.last_name.message}</p>
+                  <p className="mt-0.5 text-xs text-error-600">{errors.last_name.message}</p>
                 )}
               </div>
             </div>
@@ -153,76 +156,78 @@ const RegisterPage = () => {
                 />
               </div>
               {errors.email && (
-                <p className="mt-1 text-sm text-error-600">{errors.email.message}</p>
+                <p className="mt-0.5 text-xs text-error-600">{errors.email.message}</p>
               )}
             </div>
 
-            <div>
-              <label htmlFor="phone" className="label">
-                Phone Number *
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Phone className="h-5 w-5 text-gray-400" />
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div>
+                <label htmlFor="phone" className="label">
+                  Phone Number *
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Phone className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    {...register('phone', {
+                      required: 'Phone number is required',
+                      pattern: {
+                        value: /^0?[0-9]{9}$/,
+                        message: 'Please enter a valid 9-digit phone number (e.g., 828167854 or 0828167854)',
+                      },
+                    })}
+                    type="tel"
+                    className="input pl-10"
+                    placeholder="0828167854"
+                    maxLength={10}
+                  />
                 </div>
-                <input
-                  {...register('phone', {
-                    required: 'Phone number is required',
-                    pattern: {
-                      value: /^0?[0-9]{9}$/,
-                      message: 'Please enter a valid 9-digit phone number (e.g., 828167854 or 0828167854)',
-                    },
-                  })}
-                  type="tel"
-                  className="input pl-10"
-                  placeholder="0828167854"
-                  maxLength={10}
-                />
+                {errors.phone && (
+                  <p className="mt-0.5 text-xs text-error-600">{errors.phone.message}</p>
+                )}
               </div>
-              {errors.phone && (
-                <p className="mt-1 text-sm text-error-600">{errors.phone.message}</p>
-              )}
-            </div>
 
-            <div>
-              <label htmlFor="password" className="label">
-                Password
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Lock className="h-5 w-5 text-gray-400" />
+              <div>
+                <label htmlFor="password" className="label">
+                  Password
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Lock className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    {...register('password', {
+                      required: 'Password is required',
+                      minLength: {
+                        value: 8,
+                        message: 'Password must be at least 8 characters',
+                      },
+                      pattern: {
+                        value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
+                        message: 'Password must contain at least one uppercase letter, one lowercase letter, and one number',
+                      },
+                    })}
+                    type={showPassword ? 'text' : 'password'}
+                    className="input pl-10 pr-10"
+                    placeholder="Enter your password"
+                  />
+                  <button
+                    type="button"
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4 text-gray-400" />
+                    ) : (
+                      <Eye className="h-4 w-4 text-gray-400" />
+                    )}
+                  </button>
                 </div>
-                <input
-                  {...register('password', {
-                    required: 'Password is required',
-                    minLength: {
-                      value: 8,
-                      message: 'Password must be at least 8 characters',
-                    },
-                    pattern: {
-                      value: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-                      message: 'Password must contain at least one uppercase letter, one lowercase letter, and one number',
-                    },
-                  })}
-                  type={showPassword ? 'text' : 'password'}
-                  className="input pl-10 pr-10"
-                  placeholder="Enter your password"
-                />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-5 w-5 text-gray-400" />
-                  ) : (
-                    <Eye className="h-5 w-5 text-gray-400" />
-                  )}
-                </button>
+                {errors.password && (
+                  <p className="mt-0.5 text-xs text-error-600">{errors.password.message}</p>
+                )}
               </div>
-              {errors.password && (
-                <p className="mt-1 text-sm text-error-600">{errors.password.message}</p>
-              )}
             </div>
 
             <div>
@@ -244,23 +249,23 @@ const RegisterPage = () => {
                 />
               </div>
               {errors.confirmPassword && (
-                <p className="mt-1 text-sm text-error-600">{errors.confirmPassword.message}</p>
+                <p className="mt-0.5 text-xs text-error-600">{errors.confirmPassword.message}</p>
               )}
             </div>
           </div>
 
-          <div className="flex items-center">
+          <div className="flex items-start pt-1">
             <input
               id="agree-terms"
               name="agree-terms"
               type="checkbox"
               required
-              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+              className="h-3 w-3 text-primary-600 focus:ring-primary-500 border-gray-300 rounded mt-0.5"
             />
-            <label htmlFor="agree-terms" className="ml-2 block text-sm text-gray-900">
-              I agree to the{' '}
+            <label htmlFor="agree-terms" className="ml-2 block text-xs text-gray-900">
+              I agree to{' '}
               <a href="#" className="text-primary-600 hover:text-primary-500">
-                Terms of Service
+                Terms
               </a>{' '}
               and{' '}
               <a href="#" className="text-primary-600 hover:text-primary-500">

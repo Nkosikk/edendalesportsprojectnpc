@@ -1,13 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Users, 
-  Calendar, 
-  DollarSign, 
-  TrendingUp, 
-  Clock,
-  CheckCircle,
-  AlertCircle
-} from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
+import BookingOverview from '../../components/admin/BookingOverview';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Badge, getStatusBadgeVariant } from '../../components/ui/Badge';
 import { Table } from '../../components/ui/Table';
@@ -58,50 +51,14 @@ const AdminDashboardPage: React.FC = () => {
     );
   }
 
-  const stats = [
-    {
-      title: 'Total Revenue',
-      value: `R ${dashboard.summary.total_revenue.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}`,
-      icon: DollarSign,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
-    },
-    {
-      title: 'Total Bookings',
-      value: dashboard.summary.total_bookings.toString(),
-      icon: Calendar,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
-    },
-    {
-      title: 'Confirmed',
-      value: dashboard.summary.confirmed_bookings.toString(),
-      icon: CheckCircle,
-      color: 'text-emerald-600',
-      bgColor: 'bg-emerald-100',
-    },
-    {
-      title: 'Pending Payments',
-      value: dashboard.summary.pending_payments.toString(),
-      icon: AlertCircle,
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-100',
-    },
-    {
-      title: 'Total Hours',
-      value: dashboard.summary.total_hours.toFixed(1),
-      icon: Clock,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100',
-    },
-    {
-      title: 'Total Users',
-      value: dashboard.summary.total_users.toString(),
-      icon: Users,
-      color: 'text-indigo-600',
-      bgColor: 'bg-indigo-100',
-    },
-  ];
+  const overviewMetrics = {
+    total_revenue: dashboard.summary.total_revenue,
+    total_bookings: dashboard.summary.total_bookings,
+    confirmed_bookings: dashboard.summary.confirmed_bookings,
+    pending_payments: dashboard.summary.pending_payments,
+    total_hours: dashboard.summary.total_hours,
+    total_users: dashboard.summary.total_users,
+  };
 
   const bookingColumns = [
     {
@@ -202,23 +159,8 @@ const AdminDashboardPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-        {stats.map((stat, index) => (
-          <Card key={index}>
-            <CardContent className="py-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 mb-1">{stat.title}</p>
-                  <p className="text-2xl font-bold text-gray-900">{stat.value}</p>
-                </div>
-                <div className={`p-3 rounded-full ${stat.bgColor}`}>
-                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      <div className="mb-8">
+        <BookingOverview metrics={overviewMetrics} />
       </div>
 
       {/* Revenue Chart */}
