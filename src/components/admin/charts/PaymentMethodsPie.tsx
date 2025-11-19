@@ -28,21 +28,28 @@ export const PaymentMethodsPie: React.FC<{ data: PaymentMethodDatum[] }> = ({ da
     ]
   };
   const options = {
+    responsive: true,
+    maintainAspectRatio: false,
     plugins: {
-      legend: { position: 'bottom' as const },
-      tooltip: {
-        callbacks: {
-          label: (ctx: any) => {
-            const label = ctx.label || '';
-            const value = ctx.parsed || 0;
-            const pm = data[ctx.dataIndex];
-            return `${label}: R ${value.toFixed(2)} (${pm.total_payments} payments)`;
-          }
-        }
-      }
-    }
+      legend: {
+        position: 'top' as const, // Ensure type compatibility
+      },
+    },
   };
-  return <Pie data={chartData} options={options} />;
+
+  const styles = {
+    chartContainer: {
+      width: '300px', // Further reduce width
+      height: '300px', // Further reduce height
+      margin: '0 auto',
+    },
+  };
+
+  return (
+    <div style={styles.chartContainer}>
+      <Pie data={chartData} options={options} />
+    </div>
+  );
 };
 
 export default PaymentMethodsPie;

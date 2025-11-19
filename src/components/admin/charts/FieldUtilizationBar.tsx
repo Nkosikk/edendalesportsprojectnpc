@@ -32,10 +32,20 @@ export const FieldUtilizationBar: React.FC<{ data: FieldUtilizationDatum[] }> = 
   };
   const options = {
     responsive: true,
-    plugins: { legend: { position: 'bottom' as const } },
-    scales: { y: { beginAtZero: true } }
-  };
-  return <Bar data={chartData} options={options} />;
+    maintainAspectRatio: false,
+    plugins: { legend: { position: 'bottom' as const, labels: { boxWidth: 12 } } },
+    elements: { bar: { maxBarThickness: 18 } },
+    scales: {
+      y: { beginAtZero: true },
+      x: { ticks: { autoSkip: true, maxTicksLimit: 8 } },
+    },
+  } as const;
+  const containerStyle: React.CSSProperties = { height: 260, width: '100%' };
+  return (
+    <div style={containerStyle}>
+      <Bar data={chartData} options={options} />
+    </div>
+  );
 };
 
 export default FieldUtilizationBar;

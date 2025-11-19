@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from 'react-query';
 import { fieldService } from '../../services/fieldsService';
 import LoadingSpinner from '../ui/LoadingSpinner';
-import { mergeAvailability, AvailabilityMergedSlot, computeBookingCost } from '../../utils/scheduling';
+import { mergeAvailability, AvailabilityMergedSlot, computeBookingCost, getOperatingHours } from '../../utils/scheduling';
 import Button from '../ui/Button';
 import toast from 'react-hot-toast';
 
@@ -19,6 +19,13 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
   const [selectedStart, setSelectedStart] = useState<string | null>(null);
 
   const dateStr = date.toISOString().split('T')[0];
+
+  // Check if time slot is within operating hours
+  const isWithinOperatingHours = (timeStr: string) => {
+    const hour = parseInt(timeStr.split(':')[0]);
+    const { startHour, endHour } = getOperatingHours(date);
+    return hour >= startHour && hour < endHour;
+  };
 
   const { data, isLoading, error, refetch } = useQuery(
     ['fieldAvailability', fieldId, dateStr],
@@ -37,15 +44,29 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
   const hourlyRate = hourlyRateOverride || data?.field?.hourly_rate || 400;
 
   const handleSelect = (start: string) => {
+    // Guard: ensure starting slot exists
     const startIndex = mergedSlots.findIndex(s => s.start === start);
     if (startIndex === -1) return;
+
+    // Validate operating hours for span based on start hour and duration
+    const startHour = parseInt(start.split(':')[0]);
+    const { startHour: ohStart, endHour: ohEnd } = getOperatingHours(date);
+    if (startHour < ohStart || startHour + duration > ohEnd) {
+      toast.dismiss('outside-hours');
+      toast.error('Slot outside operating hours', { id: 'outside-hours' });
+      return;
+    }
+
+    // Validate availability across the duration
     for (let i = 0; i < duration; i++) {
       const s = mergedSlots[startIndex + i];
       if (!s || !s.available || s.blocked) {
-        toast.error('Selected range includes unavailable hours');
+        toast.dismiss('unavailable-range');
+        toast.error('Selected range includes unavailable hours', { id: 'unavailable-range' });
         return;
       }
     }
+
     const endSlot = mergedSlots[startIndex + duration - 1];
     const endTime = endSlot.end;
     setSelectedStart(start);
@@ -72,17 +93,20 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {mergedSlots.map((slot, idx) => {
           const isSelected = selectedStart === slot.start;
-          const baseUnavailable = !slot.available || slot.blocked;
+          const withinHours = isWithinOperatingHours(slot.start);
+          const baseUnavailable = !slot.available || slot.blocked || !withinHours;
           const canStartHere = (() => {
             if (baseUnavailable) return false;
             for (let i = 0; i < duration; i++) {
               const s = mergedSlots[idx + i];
-              if (!s || !s.available || s.blocked) return false;
+              if (!s || !s.available || s.blocked || !isWithinOperatingHours(s.start)) return false;
             }
             return true;
           })();
           const disabled = baseUnavailable || !canStartHere;
-          const title = !baseUnavailable && !canStartHere
+          const title = !withinHours 
+            ? 'Outside operating hours'
+            : !baseUnavailable && !canStartHere
             ? 'Not enough continuous availability for selected duration'
             : undefined;
           return (
@@ -101,10 +125,13 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
               {slot.blocked && (
                 <div className="mt-1 text-[10px] text-error-600">Blocked</div>
               )}
-              {!slot.blocked && !slot.available && (
+              {!slot.blocked && !withinHours && (
+                <div className="mt-1 text-[10px] text-gray-500">Closed</div>
+              )}
+              {!slot.blocked && withinHours && !slot.available && (
                 <div className="mt-1 text-[10px] text-gray-600">Booked</div>
               )}
-              {!baseUnavailable && !canStartHere && (
+              {withinHours && !baseUnavailable && !canStartHere && (
                 <div className="mt-1 text-[10px] text-gray-600">Too short</div>
               )}
             </button>
@@ -114,8 +141,11 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
       <div className="flex flex-wrap gap-4 text-xs text-gray-600">
         <div className="flex items-center gap-1"><span className="w-3 h-3 bg-white border rounded" /> Available</div>
         <div className="flex items-center gap-1"><span className="w-3 h-3 bg-gray-300 rounded" /> Booked</div>
-        <div className="flex items-center gap-1"><span className="w-3 h-3 bg-gray-200 rounded" /> Unavailable / Too short</div>
+        <div className="flex items-center gap-1"><span className="w-3 h-3 bg-gray-200 rounded" /> Closed / Unavailable</div>
         <div className="flex items-center gap-1"><span className="w-3 h-3 bg-primary-600 rounded" /> Selected Start</div>
+      </div>
+      <div className="text-xs text-gray-500 mt-2">
+        Operating Hours: {date.getDay() === 0 || date.getDay() === 6 ? 'Weekend 09:00-22:00' : 'Weekday 16:00-22:00'}
       </div>
       <div className="flex justify-end">
         <Button variant="outline" size="sm" onClick={() => refetch()}>Refresh</Button>

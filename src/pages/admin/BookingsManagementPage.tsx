@@ -5,6 +5,7 @@ import type { BookingDetails, AdminBookingFilters, UpdateBookingStatusRequest } 
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
 import { Table } from '../../components/ui/Table';
+import { formatCurrency } from '../../lib/utils';
 import { Card, CardContent } from '../../components/ui/Card';
 import toast from 'react-hot-toast';
 
@@ -12,12 +13,58 @@ const BookingsManagementPage: React.FC = () => {
   const [bookings, setBookings] = useState<BookingDetails[]>([]);
   const [filters, setFilters] = useState<AdminBookingFilters>({});
   const [loading, setLoading] = useState(true);
+  // Keep track of rows we already auto-completed to avoid duplicate updates
+  const autoCompletedRef = React.useRef<Set<number>>(new Set());
+  const autoAttemptedRef = React.useRef<Set<number>>(new Set());
+
+  const shouldAutoComplete = (b: BookingDetails) => {
+    if (b.status !== 'confirmed') return false;
+    // Compose a local datetime from booking_date and end_time
+    const endStr = `${b.booking_date}T${(b.end_time || '').slice(0,8)}`; // HH:mm:ss
+    const endAt = new Date(endStr);
+    if (isNaN(endAt.getTime())) return false;
+    const now = new Date();
+    return now.getTime() >= endAt.getTime();
+  };
+
+  const autoCompleteOverdue = async (rows: BookingDetails[]) => {
+    const candidates = rows.filter((b) => shouldAutoComplete(b) && !autoCompletedRef.current.has(b.id) && !autoAttemptedRef.current.has(b.id));
+    if (candidates.length === 0) return false;
+    let anySuccess = false;
+    for (const b of candidates) {
+      try {
+        autoAttemptedRef.current.add(b.id);
+        await adminService.updateBookingStatus({ booking_id: b.id, status: 'completed' });
+        autoCompletedRef.current.add(b.id);
+        anySuccess = true;
+      } catch (e) {
+        // Do not spam retries; leave as attempted for this session
+        console.error('Auto-complete failed for booking', b.id, e);
+      }
+    }
+    return anySuccess;
+  };
 
   const load = async () => {
+    console.log('BookingsManagementPage: Loading bookings with filters:', filters);
     try {
       setLoading(true);
-      const data = await adminService.getAllBookings(filters);
-      setBookings(data);
+      const bookings = await adminService.getAllBookings(filters);
+      console.log('BookingsManagementPage: Received bookings:', bookings);
+      setBookings(bookings);
+      if (!bookings || bookings.length === 0) {
+        toast.error('No bookings found. Check if you have admin permissions or if bookings exist in the system.');
+      }
+      // Attempt auto-complete for any bookings whose end time has passed
+      const changed = await autoCompleteOverdue(bookings);
+      if (changed) {
+        // Refresh once to reflect completed statuses; no loops due to attemptedRef
+        load();
+      }
+    } catch (error: any) {
+      console.error('BookingsManagementPage: Error loading bookings:', error);
+      toast.error(`Failed to load bookings: ${error?.response?.data?.message || error.message}`);
+      setBookings([]);
     } finally {
       setLoading(false);
     }
@@ -30,8 +77,9 @@ const BookingsManagementPage: React.FC = () => {
       await adminService.updateBookingStatus({ booking_id, status });
       toast.success('Status updated');
       load();
-    } catch {
-      toast.error('Failed to update status');
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || e?.message || 'Failed to update status';
+      toast.error(msg);
     }
   };
 
@@ -104,7 +152,14 @@ const BookingsManagementPage: React.FC = () => {
                 { key: 'booking_date', title: 'Date' },
                 { key: 'start_time', title: 'Start' },
                 { key: 'end_time', title: 'End' },
-                { key: 'total_amount', title: 'Amount', render: (v: number) => `R ${v.toFixed(2)}` },
+                { 
+                  key: 'total_amount', 
+                  title: 'Amount', 
+                  render: (v: any) => {
+                    const num = Number(v);
+                    return Number.isFinite(num) ? formatCurrency(num) : '—';
+                  } 
+                },
                 { key: 'status', title: 'Status' },
                 { key: 'payment_status', title: 'Payment' },
                 {
@@ -112,9 +167,22 @@ const BookingsManagementPage: React.FC = () => {
                   title: 'Actions',
                   render: (_: any, row: BookingDetails) => (
                     <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => updateStatus(row.id, 'confirmed')}>Confirm</Button>
-                      <Button size="sm" variant="outline" onClick={() => updateStatus(row.id, 'completed')}>Complete</Button>
-                      <Button size="sm" variant="error" onClick={() => updateStatus(row.id, 'cancelled')}>Cancel</Button>
+                      {/* Only allow confirming when booking is pending */}
+                      {row.status === 'pending' && (
+                        <Button size="sm" variant="outline" onClick={() => updateStatus(row.id, 'confirmed')}>Confirm</Button>
+                      )}
+
+                      {/* Only allow completing when booking is confirmed */}
+                      {row.status === 'confirmed' && (
+                        <Button size="sm" variant="outline" onClick={() => updateStatus(row.id, 'completed')}>Complete</Button>
+                      )}
+
+                      {/* Allow cancelling while pending or confirmed */}
+                      {(row.status === 'pending' || row.status === 'confirmed') && (
+                        <Button size="sm" variant="error" onClick={() => updateStatus(row.id, 'cancelled')}>Cancel</Button>
+                      )}
+
+                      {/* Manual mark paid appears only when payment is pending */}
                       {row.payment_status === 'pending' && (
                         <Button
                           size="sm"

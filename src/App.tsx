@@ -58,6 +58,9 @@ function App() {
         <Route path="profile" element={<ProfilePage />} />
         <Route path="availability" element={<FieldAvailabilityPage />} />
         <Route path="payments/status" element={<PaymentStatusPage />} />
+        <Route path="payments/return" element={<PaymentStatusPage />} />
+        <Route path="payments/cancel" element={<PaymentStatusPage />} />
+        <Route path="payments/notify" element={<PaymentStatusPage />} />
       </Route>
 
       {/* Admin Routes */}

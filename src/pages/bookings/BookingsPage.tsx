@@ -1,28 +1,97 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, Clock, Plus, Filter } from 'lucide-react';
-import { useQuery } from 'react-query';
+import { useQuery, useMutation, useQueryClient } from 'react-query';
 import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { bookingService } from '../../services/bookingService';
+import { adminService } from '../../services/adminService';
 import type { BookingDetails } from '../../types';
 import { formatDate, formatTime, formatCurrency } from '../../lib/utils';
 import PayButton from '../../components/payments/PayButton';
 import { useAuth } from '../../contexts/AuthContext';
+import toast from 'react-hot-toast';
 
 const BookingsPage = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const { user } = useAuth();
-  
-  const { data: bookings, isLoading, error } = useQuery<BookingDetails[]>(
+  const queryClient = useQueryClient();
+  const cancellingRef = useRef<Set<number>>(new Set());
+  const pollingRef = useRef<number | null>(null);
+
+
+  const { data: bookings, isLoading, error, refetch } = useQuery<BookingDetails[]>(
     ['bookings', user?.id || 'anon', statusFilter],
     () => bookingService.getBookings({
       status: statusFilter === 'all' ? undefined : (statusFilter.toLowerCase() as any),
     }),
-    { retry: 1, enabled: !!user }
+    { 
+      retry: 1, 
+      enabled: !!user,
+      staleTime: 0,  // Always treat as stale so manual refetch works immediately
+      cacheTime: 1 * 60 * 1000,  // Keep in cache for 1 minute for fast re-mounting
+    }
   );
 
-  const getStatusColor = (status: string) => {
+  // Auto-refresh when user returns from payment tab - more aggressive
+  useEffect(() => {
+    const handleFocus = () => {
+      // Force immediate fresh fetch from server when returning to tab
+      if (user) {
+        queryClient.invalidateQueries(['bookings']);
+        refetch();
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      // Also refresh when page becomes visible again
+      if (!document.hidden && user) {
+        queryClient.invalidateQueries(['bookings']);
+        refetch();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user, refetch, queryClient]);
+
+  const cancelMutation = useMutation(
+    ({ bookingId, reason }: { bookingId: number; reason?: string }) =>
+      bookingService.cancelBooking(bookingId, reason),
+    {
+      onSuccess: (_data, variables) => {
+        // mark parameter as used to satisfy TS noUnusedParameters
+        void _data;
+        cancellingRef.current.delete(variables.bookingId);
+        toast.success('Booking cancelled successfully', { id: `cancel-success-${variables.bookingId}` });
+        queryClient.invalidateQueries(['bookings']);
+      },
+      onError: (error: any, variables) => {
+        cancellingRef.current.delete(variables.bookingId);
+        // Only show if interceptor did not already display error toast
+        if (!(error as any)?._toastShown) {
+          toast.error(error?.response?.data?.message || error.message || 'Failed to cancel booking', {
+            id: `cancel-error-${variables.bookingId}`,
+          });
+        }
+      },
+    }
+  );
+
+  const handleCancelBooking = (bookingId: number) => {
+    // Prevent duplicate cancellations (handles React StrictMode double execution)
+    if (cancellingRef.current.has(bookingId)) return;
+    
+    if (window.confirm('Are you sure you want to cancel this booking?')) {
+      cancellingRef.current.add(bookingId);
+      cancelMutation.mutate({ bookingId, reason: 'Cancelled by user' });
+    }
+  };  const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed':
         return 'bg-success-100 text-success-800';
@@ -34,6 +103,55 @@ const BookingsPage = () => {
         return 'bg-gray-100 text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  // Only show admin's own bookings when user is an admin
+  const visibleBookings = useMemo(() => {
+    if (!bookings) return [] as BookingDetails[];
+    if (user?.role === 'admin') {
+      // Be tolerant of API type differences (string vs number IDs)
+      const myId = Number(user.id);
+      return bookings.filter((b) => Number(b.user_id) === myId);
+    }
+    return bookings;
+  }, [bookings, user]);
+
+  // Simple periodic refresh for pending payments - aggressive polling while paying
+  useEffect(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+    
+    const hasPendingPayments = (visibleBookings || [])
+      .some(b => b.status === 'pending' && b.payment_status === 'pending');
+    
+    if (!hasPendingPayments) return;
+
+    // Aggressive polling: check every 2 seconds while there are pending payments
+    pollingRef.current = window.setInterval(() => {
+      queryClient.invalidateQueries(['bookings']);
+      refetch({ throwOnError: false });
+    }, 2000);
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, [visibleBookings, refetch, queryClient]);
+
+  const handleMarkAsPaid = async (bookingId: string) => {
+    try {
+      console.log('BookingsPage: Marking booking as paid, ID:', bookingId);
+      await adminService.markBookingAsPaid(String(bookingId)); // Ensure bookingId is a string
+      toast.success('Booking marked as paid successfully!');
+      refetch(); // Refresh the booking list
+    } catch (error) {
+      console.error('BookingsPage: Error marking booking as paid:', error);
+      toast.error('Failed to mark booking as paid. Please try again.');
     }
   };
 
@@ -93,7 +211,7 @@ const BookingsPage = () => {
               <p className="text-error-600">Failed to load bookings. Please try again later.</p>
             </div>
           </div>
-        ) : (bookings?.length || 0) === 0 ? (
+        ) : (visibleBookings?.length || 0) === 0 ? (
           <div className="text-center py-12">
             <Calendar className="mx-auto h-12 w-12 text-gray-400 mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No bookings found</h3>
@@ -108,7 +226,7 @@ const BookingsPage = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {(bookings || []).map((booking) => (
+            {(visibleBookings || []).map((booking) => (
               <div key={booking.id} className="card hover:shadow-lg transition-shadow">
                 <div className="flex items-start justify-between mb-4">
                   <div>
@@ -116,9 +234,24 @@ const BookingsPage = () => {
                       {booking.field_name}
                     </h3>
                   </div>
-                  <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(booking.status)}`}>
-                    {booking.status.toUpperCase()}
-                  </span>
+                  <div className="flex flex-col items-end space-y-1">
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(booking.status)}`}>
+                      {booking.status.toUpperCase()}
+                    </span>
+                    {booking.status === 'cancelled' ? (
+                      <span className="px-2 py-1 text-[10px] font-semibold rounded-full bg-red-100 text-red-700">
+                        CANCELLED
+                      </span>
+                    ) : booking.payment_status === 'paid' ? (
+                      <span className="px-2 py-1 text-[10px] font-semibold rounded-full bg-green-100 text-green-700">
+                        PAID
+                      </span>
+                    ) : booking.payment_status === 'pending' && booking.status === 'pending' ? (
+                      <span className="px-2 py-1 text-[10px] font-semibold rounded-full bg-yellow-100 text-yellow-700">
+                        PAYMENT PENDING
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="space-y-2 mb-4">
@@ -145,19 +278,26 @@ const BookingsPage = () => {
                         View Details
                       </Button>
                     </Link>
-                    {booking.status === 'pending' && (
+                    {booking.status === 'pending' && booking.payment_status === 'pending' && (
                       <PayButton bookingId={booking.id} label="Pay" />
                     )}
                     {booking.status === 'pending' && (
                       <Button
                         variant="error"
                         size="sm"
-                        onClick={() => {
-                          // Handle cancel booking
-                          console.log('Cancel booking', booking.id);
-                        }}
+                        onClick={() => handleCancelBooking(booking.id)}
+                        disabled={cancellingRef.current.has(booking.id)}
                       >
-                        Cancel
+                        {cancellingRef.current.has(booking.id) ? 'Cancelling...' : 'Cancel'}
+                      </Button>
+                    )}
+                    {booking.status === 'pending' && booking.payment_status === 'pending' && (
+                      <Button
+                        variant="success"
+                        size="sm"
+                        onClick={() => handleMarkAsPaid(String(booking.id))} // Convert booking.id to string
+                      >
+                        Mark as Paid
                       </Button>
                     )}
                   </div>

@@ -38,13 +38,36 @@ export const paymentService = {
     paymentReference?: string,
     bookingId?: number
   ): Promise<PaymentStatus> => {
-    const response = await apiClient.get<ApiResponse<PaymentStatus>>('/payments/status', {
-      params: {
-        payment_reference: paymentReference,
-        booking_id: bookingId,
-      },
-    });
-    return handleApiResponse<PaymentStatus>(response);
+    try {
+      const response = await apiClient.get<ApiResponse<PaymentStatus>>('/payments/status', {
+        params: {
+          payment_reference: paymentReference,
+          booking_id: bookingId,
+        },
+      });
+      return handleApiResponse<PaymentStatus>(response);
+    } catch (e: any) {
+      const status = e?.response?.status;
+      const message: string | undefined = e?.response?.data?.message || e?.message;
+      // Gracefully handle missing payment scenario (no payment initiated yet)
+      if (status === 404 || (message && /payment\s+not\s+found/i.test(message))) {
+        // Mark as handled so callers can suppress duplicate toasts
+        (e as any)._toastShown = true;
+        return {
+          payment: {
+            id: 0,
+            payment_reference: '',
+            booking_reference: bookingId ? String(bookingId) : '',
+            payment_method: 'online',
+            amount: 0,
+            currency: 'ZAR',
+            status: 'pending',
+            created_at: new Date().toISOString(),
+          },
+        } as PaymentStatus;
+      }
+      throw e;
+    }
   },
 
   /**
@@ -65,10 +88,12 @@ export const paymentService = {
 
     const actionUrl = resolveGatewayUrl(gatewayUrl);
 
-    // Create a form and submit it to PayFast
+    // Create form in current window (hidden)
     const form = document.createElement('form');
     form.method = 'POST';
     form.action = actionUrl;
+    form.target = '_blank'; // This will open in new tab
+    form.style.display = 'none';
 
     Object.keys(gatewayData).forEach((key) => {
       const input = document.createElement('input');
@@ -80,6 +105,7 @@ export const paymentService = {
 
     document.body.appendChild(form);
     form.submit();
+    document.body.removeChild(form); // Clean up
   },
 };
 

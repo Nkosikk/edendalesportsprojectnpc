@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Button from '../ui/Button';
 import { paymentService } from '../../services/paymentService';
+import { useQueryClient } from 'react-query';
 
 interface PayButtonProps {
   bookingId: number;
@@ -10,6 +11,22 @@ interface PayButtonProps {
 
 const PayButton: React.FC<PayButtonProps> = ({ bookingId, method = 'online', label = 'Pay Now' }) => {
   const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
+
+  // Monitor for when user returns from payment (tab becomes visible again)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        // User returned to this tab - invalidate bookings cache to force fresh fetch
+        setTimeout(() => {
+          queryClient.invalidateQueries(['bookings']);
+        }, 500); // Small delay to ensure payment is processed
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [queryClient]);
 
   const handlePay = async () => {
     try {

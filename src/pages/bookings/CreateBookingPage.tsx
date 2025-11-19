@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { fieldService } from '../../services/fieldsService';
 import { bookingService } from '../../services/bookingService';
@@ -7,11 +7,21 @@ import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { SportsField } from '../../types';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const CreateBookingPage = () => {
   const [fieldId, setFieldId] = useState<number | null>(null);
   const [date, setDate] = useState<Date>(new Date());
+  const today = new Date();
+  const maxDate = new Date();
+  maxDate.setDate(maxDate.getDate() + 30);
+  // Helper: format date using local timezone components (avoids UTC day shift)
+  const formatLocalYMD = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
   const [duration, setDuration] = useState<number>(1);
   const [notes, setNotes] = useState<string>('');
   const [startTime, setStartTime] = useState<string | null>(null);
@@ -19,6 +29,7 @@ const CreateBookingPage = () => {
   const [cost, setCost] = useState<number>(0);
   const navigate = useNavigate();
   const qc = useQueryClient();
+  const [searchParams] = useSearchParams();
 
   const { data: fields = [], isLoading: loadingFields } = useQuery<SportsField[]>(
     ['fields'],
@@ -37,7 +48,7 @@ const CreateBookingPage = () => {
       if (!fieldId || !startTime || !endTime) throw new Error('Incomplete booking details');
       return bookingService.createBooking({
         field_id: fieldId,
-        booking_date: date.toISOString().split('T')[0],
+        booking_date: formatLocalYMD(date),
         start_time: startTime,
         end_time: endTime,
         notes: notes || undefined,
@@ -62,14 +73,40 @@ const CreateBookingPage = () => {
     setCost(computedCost);
   };
 
+  // Pre-populate from URL parameters (from saved booking intent) & clamp to range
+  useEffect(() => {
+    const fieldParam = searchParams.get('field_id');
+    const dateParam = searchParams.get('date');
+    const startParam = searchParams.get('start_time');
+    const endParam = searchParams.get('end_time');
+
+    if (fieldParam) setFieldId(Number(fieldParam));
+    if (dateParam) {
+      const incoming = new Date(dateParam + 'T00:00:00');
+      // Clamp incoming date to allowed range
+      if (incoming < new Date(formatLocalYMD(today) + 'T00:00:00')) {
+        setDate(new Date(formatLocalYMD(today) + 'T00:00:00'));
+      } else if (incoming > maxDate) {
+        setDate(new Date(formatLocalYMD(maxDate) + 'T00:00:00'));
+      } else {
+        setDate(incoming);
+      }
+    }
+    if (startParam) setStartTime(startParam);
+    if (endParam) setEndTime(endParam);
+  }, [searchParams]);
+
   // Reset any previously selected slot when field/date/duration changes to avoid stale summary
   useEffect(() => {
-    setStartTime(null);
-    setEndTime(null);
-    setCost(0);
-  }, [fieldId, date, duration]);
+    // Only reset if not coming from URL params
+    if (!searchParams.get('start_time')) {
+      setStartTime(null);
+      setEndTime(null);
+      setCost(0);
+    }
+  }, [fieldId, date, duration, searchParams]);
 
-  const disabledSubmit = !fieldId || !startTime || !endTime || createMutation.isLoading;
+  const disabledSubmit = !fieldId || !startTime || !endTime || cost <= 0 || createMutation.isLoading;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -110,8 +147,20 @@ const CreateBookingPage = () => {
               <label className="text-xs font-medium text-gray-700 mb-1">Date</label>
               <input
                 type="date"
-                value={date.toISOString().split('T')[0]}
-                onChange={e => setDate(new Date(e.target.value + 'T00:00:00'))}
+                value={formatLocalYMD(date)}
+                min={formatLocalYMD(today)}
+                max={formatLocalYMD(maxDate)}
+                onChange={e => {
+                  const picked = new Date(e.target.value + 'T00:00:00');
+                  // Clamp again just in case (older browsers, manual edits)
+                  if (picked < new Date(formatLocalYMD(today) + 'T00:00:00')) {
+                    setDate(new Date(formatLocalYMD(today) + 'T00:00:00'));
+                  } else if (picked > maxDate) {
+                    setDate(new Date(formatLocalYMD(maxDate) + 'T00:00:00'));
+                  } else {
+                    setDate(picked);
+                  }
+                }}
                 className="input text-sm"
               />
             </div>
@@ -153,7 +202,7 @@ const CreateBookingPage = () => {
               <h2 className="text-sm font-semibold text-gray-800">Booking Summary</h2>
               <div className="text-xs text-gray-600 space-y-1">
                 <div><span className="font-medium">Field:</span> {fieldId ? fields?.find(f => f.id === fieldId)?.name : '—'}</div>
-                <div><span className="font-medium">Date:</span> {date.toISOString().split('T')[0]}</div>
+                <div><span className="font-medium">Date:</span> {formatLocalYMD(date)}</div>
                 <div><span className="font-medium">Start:</span> {startTime || '—'}</div>
                 <div><span className="font-medium">End:</span> {endTime || '—'}</div>
                 <div><span className="font-medium">Duration:</span> {duration}h</div>
@@ -173,7 +222,7 @@ const CreateBookingPage = () => {
                   onClick={() => createMutation.mutate()}
                   className="w-full"
                 >
-                  Confirm Booking
+                  {!startTime || !endTime || cost <= 0 ? 'Select a time slot above' : 'Confirm Booking'}
                 </Button>
               </div>
               <p className="text-[10px] text-gray-500">Payment can be completed after creation (online or manual).</p>

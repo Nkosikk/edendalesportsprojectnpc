@@ -53,13 +53,19 @@ apiClient.interceptors.response.use(
 
     // Handle CORS errors specifically
     if (error.code === 'ERR_NETWORK' || error.message.includes('CORS')) {
-      toast.error('Network error. Please check your connection and try again.');
+      // Allow callers to suppress toast, e.g., for batch background calls
+      const suppressToast = originalRequest?.headers?.['X-Suppress-Error-Toast'];
+      if (!suppressToast) {
+        toast.error('Network error. Please check your connection and try again.');
+      }
       console.error('CORS Error:', error);
       return Promise.reject(new Error('Network connectivity issue'));
     }
 
     // Handle other errors
     // Only show error toast if not a handled success (status not 2xx or success false)
+    // Allow callers to suppress error toasts explicitly
+    const suppressToast = originalRequest?.headers?.['X-Suppress-Error-Toast'];
     const isSuccess = error.response?.data?.success;
     const status = error.response?.status;
     const message = error.response?.data?.message;
@@ -67,8 +73,12 @@ apiClient.interceptors.response.use(
     // Don't show toast for 401 errors as we handle them above
     const isRegistrationSuccess =
       status >= 200 && status < 300 && isSuccess && message && message.toLowerCase().includes('registration successful');
-    if (status !== 401 && !isRegistrationSuccess && !(status >= 200 && status < 300 && isSuccess)) {
-      toast.error(errorMessage);
+    if (!suppressToast && status !== 401 && !isRegistrationSuccess && !(status >= 200 && status < 300 && isSuccess)) {
+      // Deduplicate error toasts: mark error so downstream handlers can skip
+      if (!(error as any)._toastShown) {
+        toast.error(errorMessage, { id: `err-${status || 'generic'}-${errorMessage}` });
+        (error as any)._toastShown = true;
+      }
     }
     return Promise.reject(error);
   }

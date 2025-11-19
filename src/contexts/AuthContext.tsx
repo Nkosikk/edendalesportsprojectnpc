@@ -78,6 +78,21 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       setUser(userData);
       toast.success('Login successful!');
+
+      // Check for pending booking and redirect if found
+      const pendingBooking = localStorage.getItem('pendingBooking');
+      if (pendingBooking) {
+        try {
+          const booking = JSON.parse(pendingBooking);
+          // Clear the pending booking
+          localStorage.removeItem('pendingBooking');
+          // Navigate to booking creation with stored params
+          const url = `/app/bookings/new?field_id=${booking.field_id}&date=${booking.date}&start_time=${booking.start_time}&end_time=${booking.end_time}`;
+          window.location.href = url;
+        } catch (e) {
+          console.warn('Failed to parse pending booking:', e);
+        }
+      }
     } catch (error: any) {
       const message = error.response?.data?.message || 'Login failed';
       toast.error(message);
@@ -102,6 +117,21 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       setUser(newUser);
       toast.success('Registration successful!');
+
+      // Check for pending booking and redirect if found
+      const pendingBooking = localStorage.getItem('pendingBooking');
+      if (pendingBooking) {
+        try {
+          const booking = JSON.parse(pendingBooking);
+          // Clear the pending booking
+          localStorage.removeItem('pendingBooking');
+          // Navigate to booking creation with stored params
+          const url = `/app/bookings/new?field_id=${booking.field_id}&date=${booking.date}&start_time=${booking.start_time}&end_time=${booking.end_time}`;
+          window.location.href = url;
+        } catch (e) {
+          console.warn('Failed to parse pending booking:', e);
+        }
+      }
     } catch (error: any) {
       const message = error.response?.data?.message || 'Registration failed';
       toast.error(message);

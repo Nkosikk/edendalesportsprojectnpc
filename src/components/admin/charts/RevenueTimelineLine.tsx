@@ -39,15 +39,22 @@ export const RevenueTimelineLine: React.FC<{ data: RevenuePoint[] }> = ({ data }
   };
   const options = {
     responsive: true,
+    maintainAspectRatio: false,
     interaction: { mode: 'index' as const, intersect: false },
     stacked: false,
-    plugins: { legend: { position: 'bottom' as const } },
+    plugins: { legend: { position: 'bottom' as const, labels: { boxWidth: 12 } } },
+    elements: { point: { radius: 2 }, line: { borderWidth: 2 } },
     scales: {
       y: { type: 'linear' as const, position: 'left' as const },
       y1: { type: 'linear' as const, position: 'right' as const, grid: { drawOnChartArea: false } }
     }
-  };
-  return <Line data={chartData} options={options} />;
+  } as const;
+  const containerStyle: React.CSSProperties = { height: 260, width: '100%' };
+  return (
+    <div style={containerStyle}>
+      <Line data={chartData} options={options} />
+    </div>
+  );
 };
 
 export default RevenueTimelineLine;

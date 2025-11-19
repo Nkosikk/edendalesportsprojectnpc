@@ -73,6 +73,16 @@ const HomePage = () => {
 
   const handleBook = (slot: { start_time: string; end_time: string }) => {
     if (!selectedFieldId || !date) return;
+    // Store booking intent for post-login restoration
+    const bookingIntent = {
+      field_id: Number(selectedFieldId),
+      date,
+      start_time: slot.start_time,
+      end_time: slot.end_time,
+      timestamp: Date.now()
+    };
+    localStorage.setItem('pendingBooking', JSON.stringify(bookingIntent));
+    
     const url = `/app/bookings/new?field_id=${selectedFieldId}&date=${date}&start_time=${slot.start_time}&end_time=${slot.end_time}`;
     // Navigate into protected route; ProtectedRoute will redirect to login if needed
     navigate(url);

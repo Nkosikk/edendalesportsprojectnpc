@@ -7,6 +7,7 @@ import { Table } from '../../components/ui/Table';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { adminService } from '../../services/adminService';
 import type { DashboardData, BookingDetails } from '../../types';
+import { formatCurrency } from '../../lib/utils';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -97,9 +98,14 @@ const AdminDashboardPage: React.FC = () => {
     {
       key: 'total_amount',
       title: 'Amount',
-      render: (value: number) => (
-        <span className="font-semibold">R {value.toFixed(2)}</span>
-      ),
+      render: (value: any) => {
+        const num = Number(value);
+        return (
+          <span className="font-semibold">
+            {Number.isFinite(num) ? formatCurrency(num) : '—'}
+          </span>
+        );
+      },
     },
     {
       key: 'status',

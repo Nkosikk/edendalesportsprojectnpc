@@ -32,10 +32,25 @@ export const PeakHoursBar: React.FC<{ data: PeakHour[] }> = ({ data }) => {
   };
   const options = {
     responsive: true,
-    plugins: { legend: { position: 'bottom' as const } },
-    scales: { y: { beginAtZero: true } }
-  };
-  return <Bar data={chartData} options={options} />;
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { position: 'bottom' as const, labels: { boxWidth: 12 } },
+    },
+    elements: {
+      bar: { maxBarThickness: 18 },
+    },
+    scales: {
+      y: { beginAtZero: true },
+      x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 12 } },
+    },
+  } as const;
+
+  const containerStyle: React.CSSProperties = { height: 260, width: '100%' };
+  return (
+    <div style={containerStyle}>
+      <Bar data={chartData} options={options} />
+    </div>
+  );
 };
 
 export default PeakHoursBar;
