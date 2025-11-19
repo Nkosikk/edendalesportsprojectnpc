@@ -21,12 +21,14 @@ export const FieldUtilizationBar: React.FC<{ data: FieldUtilizationDatum[] }> = 
       {
         label: 'Bookings',
         data: top.map(d => d.total_bookings),
-        backgroundColor: '#2563eb'
+        backgroundColor: '#2563eb',
+        maxBarThickness: 18
       },
       {
         label: 'Utilization %',
         data: top.map(d => Number(d.utilization_percentage.toFixed(2))),
-        backgroundColor: '#10b981'
+        backgroundColor: '#10b981',
+        maxBarThickness: 18
       }
     ]
   };
@@ -34,7 +36,6 @@ export const FieldUtilizationBar: React.FC<{ data: FieldUtilizationDatum[] }> = 
     responsive: true,
     maintainAspectRatio: false,
     plugins: { legend: { position: 'bottom' as const, labels: { boxWidth: 12 } } },
-    elements: { bar: { maxBarThickness: 18 } },
     scales: {
       y: { beginAtZero: true },
       x: { ticks: { autoSkip: true, maxTicksLimit: 8 } },

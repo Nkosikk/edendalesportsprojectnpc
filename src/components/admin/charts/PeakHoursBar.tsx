@@ -21,12 +21,14 @@ export const PeakHoursBar: React.FC<{ data: PeakHour[] }> = ({ data }) => {
       {
         label: 'Bookings',
         data: sorted.map(d => d.bookings),
-        backgroundColor: '#6366f1'
+        backgroundColor: '#6366f1',
+        maxBarThickness: 18
       },
       {
         label: 'Revenue (R)',
         data: sorted.map(d => d.revenue),
-        backgroundColor: '#f59e0b'
+        backgroundColor: '#f59e0b',
+        maxBarThickness: 18
       }
     ]
   };
@@ -35,9 +37,6 @@ export const PeakHoursBar: React.FC<{ data: PeakHour[] }> = ({ data }) => {
     maintainAspectRatio: false,
     plugins: {
       legend: { position: 'bottom' as const, labels: { boxWidth: 12 } },
-    },
-    elements: {
-      bar: { maxBarThickness: 18 },
     },
     scales: {
       y: { beginAtZero: true },
