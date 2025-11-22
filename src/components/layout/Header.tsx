@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, User, LogOut, Settings, Calendar, Home, Users, Building, BarChart3, FileText } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../ui/Button';
+import LogoImg from '../../assets/images/ESP-BLUE-2.png';
 
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -35,17 +36,18 @@ const Header = () => {
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center py-1">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
-            <div className="flex-shrink-0">
-              <div className="h-8 w-8 bg-primary-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">ESP</span>
-              </div>
+          <Link to="/" className="flex flex-col items-center">
+            <img
+              src={LogoImg}
+              alt="Edendale Sports Logo"
+              className="h-32 w-auto object-contain"
+            />
+            <div className="text-center -mt-4">
+              <div className="text-lg font-bold text-gray-900">Edendale Sports Projects</div>
+              <div className="text-xs text-gray-600">(ESP)</div>
             </div>
-            <span className="font-semibold text-gray-900 text-lg">
-              Edendale Sports
-            </span>
           </Link>
 
           {/* Desktop Navigation */}

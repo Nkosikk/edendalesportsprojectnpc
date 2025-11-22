@@ -48,15 +48,15 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-4 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-lg w-full space-y-4">
+    <div className="min-h-screen flex items-start justify-center bg-gray-50 pt-4 pb-2 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-lg w-full space-y-2">
         <div>
           <div className="flex justify-center">
             <div className="h-12 w-12 bg-primary-600 rounded-xl flex items-center justify-center">
               <span className="text-white font-bold text-lg">ESP</span>
             </div>
           </div>
-          <h2 className="mt-2 text-center text-xl font-bold text-gray-900">
+          <h2 className="mt-1 text-center text-xl font-bold text-gray-900">
             Create your account
           </h2>
           <p className="mt-1 text-center text-sm text-gray-700">
