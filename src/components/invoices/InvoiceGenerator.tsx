@@ -52,7 +52,7 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
           {/* Logo */}
           <div className="flex-shrink-0">
             <img 
-              src="/src/assets/images/ESP-BLUE-2.png" 
+              src="/images/ESP-BLUE-2.png" 
               alt="Edendale Sports Complex Logo"
               className="w-16 h-16 object-contain"
             />
