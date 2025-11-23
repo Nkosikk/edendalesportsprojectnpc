@@ -280,8 +280,8 @@ const BookingsPage = () => {
                         </Button>
                       </Link>
                     )}
-                    <Link to={`/app/invoices/${booking.id}`}>
-                      <Button variant="outline" size="sm" title="View Invoice">
+                    <Link to={`/app/invoices/${booking.id}`} title="View Invoice">
+                      <Button variant="outline" size="sm">
                         <FileText className="h-4 w-4" />
                       </Button>
                     </Link>

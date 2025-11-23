@@ -53,6 +53,7 @@ export interface BookingDetails {
   total_amount: number;
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   payment_status: 'pending' | 'paid' | 'refunded' | 'failed';
+  payment_method?: 'online' | 'eft' | 'cash' | 'card';
   notes?: string;
   created_at: string;
   updated_at: string;
