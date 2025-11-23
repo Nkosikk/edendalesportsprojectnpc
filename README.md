@@ -229,9 +229,12 @@ For support, please contact:
 
 ## 📋 Roadmap
 
-- [ ] Enhanced booking calendar interface
-- [ ] Payment integration
+- [x] Enhanced booking calendar interface
+- [x] Payment integration (PayFast)
 - [ ] Real-time notifications
 - [ ] Mobile app version
 - [ ] Advanced reporting dashboard
 - [ ] Multi-language support
+
+---
+*Last updated: November 2025 - PayFast payment integration configured*
