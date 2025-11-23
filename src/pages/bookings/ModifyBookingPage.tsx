@@ -213,11 +213,6 @@ const ModifyBookingPage = () => {
               date={date} 
               duration={duration} 
               onSelect={handleSelect}
-              currentBooking={{
-                start_time: booking.start_time,
-                end_time: booking.end_time,
-                date: booking.booking_date
-              }}
             />
           ) : (
             <div className="text-center py-8 text-gray-500">

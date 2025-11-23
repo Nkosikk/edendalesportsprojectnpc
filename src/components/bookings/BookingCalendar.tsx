@@ -12,14 +12,9 @@ interface BookingCalendarProps {
   duration: number; // hours
   hourlyRateOverride?: number;
   onSelect: (startTime: string, endTime: string, cost: number) => void;
-  currentBooking?: {
-    start_time: string;
-    end_time: string;
-    date: string;
-  };
 }
 
-const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect, currentBooking }: BookingCalendarProps) => {
+const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect }: BookingCalendarProps) => {
   const [mergedSlots, setMergedSlots] = useState<AvailabilityMergedSlot[]>([]);
   const [selectedStart, setSelectedStart] = useState<string | null>(null);
 
@@ -134,13 +129,13 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
 
   return (
     <div className="space-y-4">
-      {error && data && (
+      {error && data ? (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
           <div className="text-yellow-800">
             ⚠️ Using offline availability data - server connection failed
           </div>
         </div>
-      )}
+      ) : null}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {mergedSlots.map((slot, idx) => {
           const isSelected = selectedStart === slot.start;
