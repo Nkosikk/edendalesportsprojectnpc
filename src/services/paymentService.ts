@@ -75,6 +75,19 @@ export const paymentService = {
    * This will redirect the user to PayFast payment page
    */
   redirectToPayment: (gatewayUrl: string, gatewayData: Record<string, any>) => {
+    // Debug: Log environment variables
+    console.log('PayFast Mode:', import.meta.env.VITE_PAYFAST_MODE);
+    console.log('Merchant ID:', import.meta.env.VITE_PAYFAST_MERCHANT_ID);
+    console.log('Merchant Key:', import.meta.env.VITE_PAYFAST_MERCHANT_KEY);
+    console.log('All PayFast env vars:', {
+      mode: import.meta.env.VITE_PAYFAST_MODE,
+      merchantId: import.meta.env.VITE_PAYFAST_MERCHANT_ID,
+      merchantKey: import.meta.env.VITE_PAYFAST_MERCHANT_KEY,
+      passphrase: import.meta.env.VITE_PAYFAST_PASSPHRASE,
+      sandboxUrl: import.meta.env.VITE_PAYFAST_SANDBOX_URL,
+      liveUrl: import.meta.env.VITE_PAYFAST_LIVE_URL,
+    });
+
     // Determine final action URL based on env override or provided gateway URL
     const mode = (import.meta.env.VITE_PAYFAST_MODE || 'auto') as 'auto' | 'sandbox' | 'live';
     const sandboxUrl = import.meta.env.VITE_PAYFAST_SANDBOX_URL || 'https://sandbox.payfast.co.za/eng/process';
@@ -87,6 +100,8 @@ export const paymentService = {
     };
 
     const actionUrl = resolveGatewayUrl(gatewayUrl);
+    console.log('Final PayFast URL:', actionUrl);
+    console.log('Gateway Data:', gatewayData);
 
     // Create form in current window (hidden)
     const form = document.createElement('form');
