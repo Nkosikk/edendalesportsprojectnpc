@@ -19,6 +19,13 @@ export const apiClient: AxiosInstance = axios.create({
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
+    // Bust caches on GET requests to ensure latest booking/payment data
+    if ((config.method || 'get').toLowerCase() === 'get') {
+      config.params = {
+        ...(config.params || {}),
+        _ts: Date.now(),
+      };
+    }
     const token = localStorage.getItem('accessToken');
     // Do not attach Authorization for login/register endpoints
     const path = (config.url || '').toLowerCase();

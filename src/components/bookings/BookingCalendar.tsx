@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQuery } from 'react-query';
 import { fieldService } from '../../services/fieldsService';
 import LoadingSpinner from '../ui/LoadingSpinner';
-import { mergeAvailability, AvailabilityMergedSlot, computeBookingCost, getOperatingHours } from '../../utils/scheduling';
+import { mergeAvailability, AvailabilityMergedSlot, computeBookingCost, getOperatingHours, isWeekend, isPublicHoliday, generateHourlySlots } from '../../utils/scheduling';
 import Button from '../ui/Button';
 import toast from 'react-hot-toast';
 
@@ -19,6 +19,7 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
   const [selectedStart, setSelectedStart] = useState<string | null>(null);
 
   const dateStr = date.toISOString().split('T')[0];
+  const durationHours = Math.max(1, Number(duration) || 1);
 
   // Check if time slot is within operating hours
   const isWithinOperatingHours = (timeStr: string) => {
@@ -28,26 +29,24 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
   };
 
   const { data, isLoading, error, refetch } = useQuery(
-    ['fieldAvailability', fieldId, dateStr],
+    ['fieldAvailability', fieldId, dateStr, durationHours],
     async () => {
       if (!fieldId) return undefined;
       try {
-        return await fieldService.getFieldAvailability(fieldId, dateStr, duration);
+        return await fieldService.getFieldAvailability(fieldId, dateStr, durationHours);
       } catch (err: any) {
         console.warn('API availability failed, using fallback:', err.message);
-        // Return fallback availability data
+        // Return fallback availability data aligned with operating hours
+        const fallbackSlots = generateHourlySlots(date).map(slot => ({
+          start_time: slot.start,
+          end_time: slot.end,
+          available: true,
+          blocked: false,
+          price: 400,
+        }));
         return {
           field: { id: fieldId, hourly_rate: 400 },
-          slots: Array.from({ length: 12 }, (_, i) => {
-            const hour = i + 8; // 8 AM to 8 PM
-            return {
-              start_time: `${hour.toString().padStart(2, '0')}:00`,
-              end_time: `${(hour + 1).toString().padStart(2, '0')}:00`,
-              available: true,
-              blocked: false,
-              price: 400
-            };
-          })
+          slots: fallbackSlots,
         };
       }
     },
@@ -60,7 +59,7 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
 
   useEffect(() => {
     setSelectedStart(null);
-  }, [fieldId, dateStr, duration]);
+  }, [fieldId, dateStr, durationHours]);
 
   useEffect(() => {
     setMergedSlots(mergeAvailability(date, data));
@@ -73,17 +72,8 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
     const startIndex = mergedSlots.findIndex(s => s.start === start);
     if (startIndex === -1) return;
 
-    // Validate operating hours for span based on start hour and duration
-    const startHour = parseInt(start.split(':')[0]);
-    const { startHour: ohStart, endHour: ohEnd } = getOperatingHours(date);
-    if (startHour < ohStart || startHour + duration > ohEnd) {
-      toast.dismiss('outside-hours');
-      toast.error('Slot outside operating hours', { id: 'outside-hours' });
-      return;
-    }
-
     // Validate availability across the duration
-    for (let i = 0; i < duration; i++) {
+    for (let i = 0; i < durationHours; i++) {
       const s = mergedSlots[startIndex + i];
       if (!s || !s.available || s.blocked) {
         toast.dismiss('unavailable-range');
@@ -92,10 +82,10 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
       }
     }
 
-    const endSlot = mergedSlots[startIndex + duration - 1];
+    const endSlot = mergedSlots[startIndex + durationHours - 1];
     const endTime = endSlot.end;
     setSelectedStart(start);
-    const cost = computeBookingCost(hourlyRate, duration);
+    const cost = computeBookingCost(hourlyRate, durationHours);
     onSelect(start, endTime, cost);
   };
 
@@ -143,7 +133,7 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
           const baseUnavailable = !slot.available || slot.blocked || !withinHours;
           const canStartHere = (() => {
             if (baseUnavailable) return false;
-            for (let i = 0; i < duration; i++) {
+            for (let i = 0; i < durationHours; i++) {
               const s = mergedSlots[idx + i];
               if (!s || !s.available || s.blocked || !isWithinOperatingHours(s.start)) return false;
             }
@@ -195,8 +185,10 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
         <div className="flex items-center gap-1"><span className="w-3 h-3 bg-primary-600 rounded" /> Selected Start</div>
       </div>
       <div className="text-xs text-gray-500 mt-2">
-        <div>Operating Hours: {date.getDay() === 0 || date.getDay() === 6 ? 'Weekend 09:00-22:00' : 'Weekday 16:00-22:00'}</div>
-        <div className="mt-1">Selected duration: {duration} hour{duration > 1 ? 's' : ''}</div>
+        <div>
+          Operating Hours: {isWeekend(date) || isPublicHoliday(date) ? 'Weekend / Public Holiday 09:00-22:00' : 'Weekday 16:00-22:00'}
+        </div>
+        <div className="mt-1">Selected duration: {durationHours} hour{durationHours > 1 ? 's' : ''}</div>
       </div>
       <div className="flex justify-end">
         <Button variant="outline" size="sm" onClick={() => refetch()}>Refresh</Button>

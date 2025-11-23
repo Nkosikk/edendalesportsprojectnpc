@@ -8,10 +8,11 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { SportsField } from '../../types';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { toApiTime } from '../../utils/scheduling';
 
 const CreateBookingPage = () => {
   const [fieldId, setFieldId] = useState<number | null>(null);
-  const [date, setDate] = useState<Date>(new Date());
+  const [date, setDate] = useState<Date | null>(null);
   const today = new Date();
   const maxDate = new Date();
   maxDate.setDate(maxDate.getDate() + 30);
@@ -45,12 +46,12 @@ const CreateBookingPage = () => {
 
   const createMutation = useMutation(
     async () => {
-      if (!fieldId || !startTime || !endTime) throw new Error('Incomplete booking details');
+      if (!fieldId || !date || !startTime || !endTime) throw new Error('Incomplete booking details');
       return bookingService.createBooking({
         field_id: fieldId,
         booking_date: formatLocalYMD(date),
-        start_time: startTime,
-        end_time: endTime,
+        start_time: toApiTime(startTime),
+        end_time: toApiTime(endTime),
         notes: notes || undefined,
       });
     },
@@ -106,7 +107,7 @@ const CreateBookingPage = () => {
     }
   }, [fieldId, date, duration, searchParams]);
 
-  const disabledSubmit = !fieldId || !startTime || !endTime || cost <= 0 || createMutation.isLoading;
+  const disabledSubmit = !fieldId || !date || !startTime || !endTime || cost <= 0 || createMutation.isLoading;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -147,10 +148,14 @@ const CreateBookingPage = () => {
               <label className="text-xs font-medium text-gray-700 mb-1">Date</label>
               <input
                 type="date"
-                value={formatLocalYMD(date)}
+                value={date ? formatLocalYMD(date) : ''}
                 min={formatLocalYMD(today)}
                 max={formatLocalYMD(maxDate)}
                 onChange={e => {
+                  if (!e.target.value) {
+                    setDate(null);
+                    return;
+                  }
                   const picked = new Date(e.target.value + 'T00:00:00');
                   // Clamp again just in case (older browsers, manual edits)
                   if (picked < new Date(formatLocalYMD(today) + 'T00:00:00')) {
@@ -178,12 +183,18 @@ const CreateBookingPage = () => {
 
           {/* Calendar */}
           <div className="bg-white p-4 rounded-lg border">
-            <BookingCalendar
-              fieldId={fieldId}
-              date={date}
-              duration={duration}
-              onSelect={handleSelectSlot}
-            />
+            {date ? (
+              <BookingCalendar
+                fieldId={fieldId}
+                date={date}
+                duration={duration}
+                onSelect={handleSelectSlot}
+              />
+            ) : (
+              <div className="text-sm text-gray-600">
+                Select a date to view available time slots.
+              </div>
+            )}
           </div>
 
           {/* Notes & Summary */}
@@ -202,7 +213,7 @@ const CreateBookingPage = () => {
               <h2 className="text-sm font-semibold text-gray-800">Booking Summary</h2>
               <div className="text-xs text-gray-600 space-y-1">
                 <div><span className="font-medium">Field:</span> {fieldId ? fields?.find(f => f.id === fieldId)?.name : '—'}</div>
-                <div><span className="font-medium">Date:</span> {formatLocalYMD(date)}</div>
+                <div><span className="font-medium">Date:</span> {date ? formatLocalYMD(date) : '—'}</div>
                 <div><span className="font-medium">Start:</span> {startTime || '—'}</div>
                 <div><span className="font-medium">End:</span> {endTime || '—'}</div>
                 <div><span className="font-medium">Duration:</span> {duration}h</div>

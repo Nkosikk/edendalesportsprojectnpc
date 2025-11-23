@@ -16,7 +16,7 @@ export const paymentService = {
    * Process/initiate a payment
    */
   processPayment: async (data: CreatePaymentRequest): Promise<PaymentResponse> => {
-    const response = await apiClient.post<ApiResponse<PaymentResponse>>('/payments', data);
+    const response = await apiClient.post<ApiResponse<PaymentResponse>>('/payments/process', data);
     return handleApiResponse<PaymentResponse>(response);
   },
 

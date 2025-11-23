@@ -58,7 +58,14 @@ const BookingDetailsPage = () => {
   const handleMarkAsPaid = async () => {
     try {
       setMarkingPaid(true);
-      await paymentService.confirmPayment(undefined, bookingId);
+      
+      // Use the direct API call to mark payment as processed
+      await paymentService.processPayment({
+        booking_id: bookingId,
+        payment_method: 'cash',
+        notes: 'Payment manually confirmed by admin'
+      });
+      
       toast.success('Payment marked as received');
       
       // Refresh booking data
@@ -179,9 +186,10 @@ const BookingDetailsPage = () => {
             )}
             {user?.role === 'admin' && booking.payment_status === 'pending' && (
               <Button 
-                variant="outline" 
+                status="paid"
                 onClick={handleMarkAsPaid}
                 loading={markingPaid}
+                size="sm"
               >
                 Mark as Paid
               </Button>
@@ -195,8 +203,9 @@ const BookingDetailsPage = () => {
             </Button>
             {booking.status === 'pending' && (
               <Button 
-                variant="error" 
+                status="cancelled" 
                 onClick={() => setShowCancelModal(true)}
+                size="sm"
               >
                 Cancel Booking
               </Button>

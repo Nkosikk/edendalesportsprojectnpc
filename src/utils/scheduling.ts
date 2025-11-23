@@ -4,6 +4,45 @@ export const WEEKDAY_END_HOUR = 22; // exclusive end
 export const WEEKEND_START_HOUR = 9;
 export const WEEKEND_END_HOUR = 22; // exclusive end
 
+// Basic SA public holidays (MM-DD). Adjust as needed.
+const PUBLIC_HOLIDAYS: string[] = [
+  '01-01', // New Year's Day
+  '03-21', // Human Rights Day
+  '04-27', // Freedom Day
+  '05-01', // Workers' Day
+  '06-16', // Youth Day
+  '08-09', // National Women's Day
+  '09-24', // Heritage Day
+  '12-16', // Day of Reconciliation
+  '12-25', // Christmas Day
+  '12-26', // Day of Goodwill
+];
+
+export const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+
+const sanitizeNumber = (value: string | number | undefined, fallback = 0) => {
+  const num = Number(value);
+  if (Number.isNaN(num)) return fallback;
+  return num;
+};
+
+export const normalizeTimeHM = (time: string | null | undefined): string => {
+  if (!time) return '';
+  const parts = time.split(':');
+  const hour = Math.min(23, Math.max(0, sanitizeNumber(parts[0], 0)));
+  const minute = Math.min(59, Math.max(0, sanitizeNumber(parts[1], 0)));
+  return `${pad(hour)}:${pad(minute)}`;
+};
+
+export const toApiTime = (time: string | null | undefined): string => {
+  if (!time) return '';
+  const parts = time.split(':');
+  const hour = Math.min(23, Math.max(0, sanitizeNumber(parts[0], 0)));
+  const minute = Math.min(59, Math.max(0, sanitizeNumber(parts[1], 0)));
+  const second = Math.min(59, Math.max(0, sanitizeNumber(parts[2], 0)));
+  return `${pad(hour)}:${pad(minute)}:${pad(second)}`;
+};
+
 export interface HourSlot {
   start: string; // HH:MM
   end: string;   // HH:MM
@@ -14,14 +53,17 @@ export const isWeekend = (date: Date) => {
   return day === 0 || day === 6;
 };
 
+export const isPublicHoliday = (date: Date) => {
+  const key = `${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+  return PUBLIC_HOLIDAYS.includes(key);
+};
+
 export const getOperatingHours = (date: Date): { startHour: number; endHour: number } => {
-  if (isWeekend(date)) {
+  if (isWeekend(date) || isPublicHoliday(date)) {
     return { startHour: WEEKEND_START_HOUR, endHour: WEEKEND_END_HOUR };
   }
   return { startHour: WEEKDAY_START_HOUR, endHour: WEEKDAY_END_HOUR };
 };
-
-export const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 
 export const generateHourlySlots = (date: Date): HourSlot[] => {
   const { startHour, endHour } = getOperatingHours(date);
@@ -54,12 +96,16 @@ export const mergeAvailability = (
 
   const blockedMap = new Map<string, { status: string; reason?: string }>();
   availability.blocked_slots?.forEach(b => {
-    blockedMap.set(`${b.start_time}-${b.end_time}`, { status: b.status, reason: b.reason });
+    const start = normalizeTimeHM(b.start_time);
+    const end = normalizeTimeHM(b.end_time);
+    blockedMap.set(`${start}-${end}`, { status: b.status, reason: b.reason });
   });
 
   const availMap = new Map<string, { available: boolean; price: number }>();
   availability.slots?.forEach(s => {
-    availMap.set(`${s.start_time}-${s.end_time}`, { available: s.available, price: s.price });
+    const start = normalizeTimeHM(s.start_time);
+    const end = normalizeTimeHM(s.end_time);
+    availMap.set(`${start}-${end}`, { available: s.available, price: s.price });
   });
 
   return base.map(slot => {

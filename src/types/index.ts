@@ -52,7 +52,7 @@ export interface BookingDetails {
   hourly_rate: number;
   total_amount: number;
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
-  payment_status: 'pending' | 'paid' | 'refunded' | 'failed';
+  payment_status: 'pending' | 'paid' | 'refunded' | 'failed' | 'manual_pending';
   payment_method?: 'online' | 'eft' | 'cash' | 'card';
   notes?: string;
   created_at: string;

@@ -5,6 +5,7 @@ import type {
   CreateFieldRequest,
   ApiResponse,
 } from '../types';
+import { normalizeTimeHM } from '../utils/scheduling';
 
 // Normalize backend field payloads to strict frontend types
 const normalizeField = (f: any): SportsField => {
@@ -97,16 +98,16 @@ export const fieldService = {
 
     const slotsSrc: any[] = Array.isArray(payload?.slots) ? payload.slots : [];
     const slots = slotsSrc.map((s) => ({
-      start_time: String(s.start_time ?? s.start ?? ''),
-      end_time: String(s.end_time ?? s.end ?? ''),
+      start_time: normalizeTimeHM(String(s.start_time ?? s.start ?? '')),
+      end_time: normalizeTimeHM(String(s.end_time ?? s.end ?? '')),
       available: toBool(s.available ?? s.is_available ?? s.free ?? true),
       price: num(s.price ?? s.amount ?? hourly),
     }));
 
     const blockedSrc: any[] = Array.isArray(payload?.blocked_slots) ? payload.blocked_slots : (Array.isArray(payload?.blocked) ? payload.blocked : []);
     const blocked_slots = blockedSrc.map((b) => ({
-      start_time: String(b.start_time ?? b.start ?? ''),
-      end_time: String(b.end_time ?? b.end ?? ''),
+      start_time: normalizeTimeHM(String(b.start_time ?? b.start ?? '')),
+      end_time: normalizeTimeHM(String(b.end_time ?? b.end ?? '')),
       status: (b.status ?? 'blocked') as 'blocked' | 'maintenance' | 'event',
       reason: b.reason ?? undefined,
     }));
@@ -121,8 +122,8 @@ export const fieldService = {
       date: String(payload?.date ?? date),
       duration_hours: num(payload?.duration_hours ?? duration),
       operating_hours: {
-        start_time: String(payload?.operating_hours?.start_time ?? payload?.operating_start ?? '16:00'),
-        end_time: String(payload?.operating_hours?.end_time ?? payload?.operating_end ?? '22:00'),
+        start_time: normalizeTimeHM(String(payload?.operating_hours?.start_time ?? payload?.operating_start ?? '16:00')),
+        end_time: normalizeTimeHM(String(payload?.operating_hours?.end_time ?? payload?.operating_end ?? '22:00')),
       },
       slots,
       blocked_slots,

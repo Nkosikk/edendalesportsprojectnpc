@@ -2,14 +2,16 @@ import React, { useState, useEffect } from 'react';
 import Button from '../ui/Button';
 import { paymentService } from '../../services/paymentService';
 import { useQueryClient } from 'react-query';
+import { CreditCard, type LucideIcon } from 'lucide-react';
 
 interface PayButtonProps {
   bookingId: number;
   method?: 'online' | 'eft' | 'cash' | 'card';
   label?: string;
+  icon?: LucideIcon;
 }
 
-const PayButton: React.FC<PayButtonProps> = ({ bookingId, method = 'online', label = 'Pay Now' }) => {
+const PayButton: React.FC<PayButtonProps> = ({ bookingId, method = 'online', label = 'Pay Now', icon = CreditCard }) => {
   const [loading, setLoading] = useState(false);
   const queryClient = useQueryClient();
 
@@ -41,7 +43,7 @@ const PayButton: React.FC<PayButtonProps> = ({ bookingId, method = 'online', lab
   };
 
   return (
-    <Button onClick={handlePay} disabled={loading} size="sm">
+    <Button onClick={handlePay} disabled={loading} size="sm" icon={icon}>
       {loading ? 'Processing...' : label}
     </Button>
   );

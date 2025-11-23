@@ -4,7 +4,19 @@ import Footer from './Footer';
 import { useState } from 'react';
 
 const Layout = () => {
-  const [showPopia, setShowPopia] = useState(true);
+  // Check sessionStorage to show POPIA notice only once per session
+  const [showPopia, setShowPopia] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const acknowledged = sessionStorage.getItem('popia_acknowledged');
+      return !acknowledged;
+    }
+    return true;
+  });
+
+  const handleAcknowledge = () => {
+    sessionStorage.setItem('popia_acknowledged', 'true');
+    setShowPopia(false);
+  };
   return (
     <div className="min-h-screen flex flex-col">
       <Header />
@@ -18,7 +30,7 @@ const Layout = () => {
           <p className="text-gray-600 mb-3">We process your personal data (contact & booking details) only to manage reservations in compliance with POPIA. By continuing you consent to this processing.</p>
           <div className="flex justify-end gap-2">
             <button
-              onClick={() => setShowPopia(false)}
+              onClick={handleAcknowledge}
               className="px-3 py-1 rounded-md bg-primary-600 text-white hover:bg-primary-700"
             >Acknowledge</button>
           </div>

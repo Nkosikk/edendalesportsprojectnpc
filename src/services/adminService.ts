@@ -147,6 +147,80 @@ export const adminService = {
   },
 
   /**
+   * Get a single booking by ID (fresh from backend)
+   */
+  getBookingById: async (bookingId: number): Promise<BookingDetails> => {
+    console.log('AdminService: Fetching single booking ID:', bookingId);
+    const response = await apiClient.get<ApiResponse<BookingDetails>>(`/admin/bookings/${bookingId}`);
+    console.log('AdminService: Single booking raw response:', response.data);
+    
+    const payload = handleApiResponse<any>(response);
+    console.log('AdminService: Single booking processed payload:', payload);
+    
+    const normalizePaymentStatus = (row: any): BookingDetails['payment_status'] => {
+      // First check boolean/timestamp flags - these are most reliable
+      const isPaidFlag = row?.is_paid === true || row?.is_paid === 1 || row?.is_paid === '1' || !!row?.paid_at || !!row?.payment_confirmed_at;
+      if (isPaidFlag) return 'paid';
+      
+      // Check all possible field names for payment status
+      const paymentFields = [
+        row?.payment_status,
+        row?.paymentStatus,
+        row?.payment?.status,
+        row?.payment_status_text,
+        row?.status_payment,
+        row?.payment_state,
+        row?.paymentState,
+        row?.payment?.state,
+      ];
+      
+      for (const field of paymentFields) {
+        const raw = (field ?? '').toString().toLowerCase().trim();
+        if (!raw) continue;
+        
+        // Exact matches first
+        if (raw === 'paid' || raw === 'success' || raw === 'completed' || raw === '1') return 'paid';
+        if (raw === 'manual_pending' || raw === 'manual pending') return 'manual_pending';
+        if (raw === 'refunded' || raw === 'refund') return 'refunded';
+        if (raw === 'failed' || raw === 'fail') return 'failed';
+        if (raw === 'pending') return 'pending';
+        
+        // Substring matches for robustness
+        if (raw.includes('paid') || raw.includes('success')) return 'paid';
+        if (raw.includes('manual')) return 'manual_pending';
+        if (raw.includes('refund')) return 'refunded';
+        if (raw.includes('fail')) return 'failed';
+      }
+      
+      return 'pending';
+    };
+
+    const normalizeBookingStatus = (row: any): BookingDetails['status'] => {
+      const raw = (row?.status ?? row?.booking_status ?? row?.bookingStatus ?? row?.status_text ?? '').toString().toLowerCase();
+      if (raw.startsWith('cancel')) return 'cancelled';
+      if (raw.startsWith('confirm')) return 'confirmed';
+      if (raw.startsWith('complete') || raw === 'done' || raw === 'finalized' || raw === 'finished') return 'completed';
+      if (raw) return (['pending','confirmed','cancelled','completed'].includes(raw) ? raw : 'pending') as BookingDetails['status'];
+      return 'pending';
+    };
+
+    const booking = payload as any;
+    console.log('AdminService: Normalizing single booking');
+    const normalized: any = { ...booking };
+    normalized.id = Number(booking.id ?? booking.booking_id ?? booking.bookingId);
+    normalized.booking_reference = String(booking.booking_reference ?? booking.reference ?? booking.booking_ref ?? booking.ref ?? '');
+    const amt = Number(booking.total_amount ?? booking.amount ?? booking.total ?? booking.price);
+    if (Number.isFinite(amt)) normalized.total_amount = amt;
+    normalized.payment_status = normalizePaymentStatus(booking);
+    normalized.status = normalizeBookingStatus(booking);
+    normalized.created_at = String(booking.created_at ?? booking.booking_created_at ?? booking.createdAt ?? booking.created ?? new Date().toISOString());
+    normalized.updated_at = String(booking.updated_at ?? booking.booking_updated_at ?? booking.updatedAt ?? booking.updated ?? normalized.created_at);
+    
+    console.log('AdminService: Final normalized booking:', normalized);
+    return normalized as BookingDetails;
+  },
+
+  /**
    * Get all bookings (admin view with filters)
    */
   getAllBookings: async (filters?: AdminBookingFilters): Promise<BookingDetails[]> => {
@@ -159,17 +233,86 @@ export const adminService = {
     const payload = handleApiResponse<any>(response);
     console.log('AdminService: Processed payload:', payload);
     
-    if (Array.isArray(payload)) {
-      console.log('AdminService: Found array payload, length:', payload.length);
-      return payload as BookingDetails[];
-    }
-    if (Array.isArray(payload?.data)) {
-      console.log('AdminService: Found payload.data array, length:', payload.data.length);
-      return payload.data as BookingDetails[];
-    }
-    if (Array.isArray(payload?.bookings)) {
-      console.log('AdminService: Found payload.bookings array, length:', payload.bookings.length);
-      return payload.bookings as BookingDetails[];
+    const normalizePaymentStatus = (row: any): BookingDetails['payment_status'] => {
+      // First check boolean/timestamp flags - these are most reliable
+      const isPaidFlag = row?.is_paid === true || row?.is_paid === 1 || row?.is_paid === '1' || !!row?.paid_at || !!row?.payment_confirmed_at;
+      if (isPaidFlag) return 'paid';
+      
+      // Check all possible field names for payment status
+      const paymentFields = [
+        row?.payment_status,
+        row?.paymentStatus,
+        row?.payment?.status,
+        row?.payment_status_text,
+        row?.status_payment,
+        row?.payment_state,
+        row?.paymentState,
+        row?.payment?.state,
+      ];
+      
+      for (const field of paymentFields) {
+        const raw = (field ?? '').toString().toLowerCase().trim();
+        if (!raw) continue;
+        
+        // Exact matches first
+        if (raw === 'paid' || raw === 'success' || raw === 'completed' || raw === '1') return 'paid';
+        if (raw === 'manual_pending' || raw === 'manual pending') return 'manual_pending';
+        if (raw === 'refunded' || raw === 'refund') return 'refunded';
+        if (raw === 'failed' || raw === 'fail') return 'failed';
+        if (raw === 'pending') return 'pending';
+        
+        // Substring matches for robustness
+        if (raw.includes('paid') || raw.includes('success')) return 'paid';
+        if (raw.includes('manual')) return 'manual_pending';
+        if (raw.includes('refund')) return 'refunded';
+        if (raw.includes('fail')) return 'failed';
+      }
+      
+      return 'pending';
+    };
+
+    const normalizeBookingStatus = (row: any): BookingDetails['status'] => {
+      const raw = (row?.status ?? row?.booking_status ?? row?.bookingStatus ?? row?.status_text ?? '').toString().toLowerCase();
+      if (raw.startsWith('cancel')) return 'cancelled';
+      if (raw.startsWith('confirm')) return 'confirmed';
+      if (raw.startsWith('complete') || raw === 'done' || raw === 'finalized' || raw === 'finished') return 'completed';
+      if (raw) return (['pending','confirmed','cancelled','completed'].includes(raw) ? raw : 'pending') as BookingDetails['status'];
+      return 'pending';
+    };
+
+    const shapeToArray = (src: any): any[] | null => {
+      if (Array.isArray(src)) return src;
+      if (Array.isArray(src?.data)) return src.data;
+      if (Array.isArray(src?.bookings)) return src.bookings;
+      if (Array.isArray(src?.items)) return src.items;
+      if (Array.isArray(src?.results)) return src.results;
+      if (Array.isArray(src?.records)) return src.records;
+      return null;
+    };
+
+    const list = shapeToArray(payload);
+    if (list) {
+      console.log('AdminService: Normalizing bookings array, length:', list.length);
+      return (list as any[]).map((b) => {
+        try {
+          const normalized: any = { ...b };
+          // Normalize identifiers
+          normalized.id = Number(b.id ?? b.booking_id ?? b.bookingId);
+          normalized.booking_reference = String(b.booking_reference ?? b.reference ?? b.booking_ref ?? b.ref ?? '');
+          // Normalize money/time fields defensively
+          const amt = Number(b.total_amount ?? b.amount ?? b.total ?? b.price);
+          if (Number.isFinite(amt)) normalized.total_amount = amt; 
+          // Normalize statuses
+          normalized.payment_status = normalizePaymentStatus(b);
+          normalized.status = normalizeBookingStatus(b);
+          // Normalize timestamps for consistent sorting
+          normalized.created_at = String(b.created_at ?? b.booking_created_at ?? b.createdAt ?? b.created ?? new Date().toISOString());
+          normalized.updated_at = String(b.updated_at ?? b.booking_updated_at ?? b.updatedAt ?? b.updated ?? normalized.created_at);
+          return normalized as BookingDetails;
+        } catch {
+          return b as BookingDetails;
+        }
+      });
     }
     
     console.warn('AdminService: No recognizable array found in response, returning empty array');

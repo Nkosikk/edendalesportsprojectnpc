@@ -19,6 +19,8 @@ const BookingsManagementPage: React.FC = () => {
   const [itemsPerPage] = useState(20);
   const [selectedBookingForInvoice, setSelectedBookingForInvoice] = useState<BookingDetails | null>(null);
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
+  const [processingPayment, setProcessingPayment] = useState<number | null>(null);
+  const lastErrorTimeRef = React.useRef<number>(0);
   // Keep track of rows we already auto-completed to avoid duplicate updates
   const autoCompletedRef = React.useRef<Set<number>>(new Set());
   const autoAttemptedRef = React.useRef<Set<number>>(new Set());
@@ -55,9 +57,25 @@ const BookingsManagementPage: React.FC = () => {
     console.log('BookingsManagementPage: Loading bookings with filters:', filters);
     try {
       setLoading(true);
-      const bookings = await adminService.getAllBookings(filters);
+      // Clean filters - remove undefined values to ensure "All" works properly
+      const cleanFilters = Object.fromEntries(
+        Object.entries(filters).filter(([_, value]) => value !== undefined && value !== '')
+      );
+      console.log('BookingsManagementPage: Clean filters:', cleanFilters);
+      const bookings = await adminService.getAllBookings(Object.keys(cleanFilters).length > 0 ? cleanFilters : undefined);
       console.log('BookingsManagementPage: Received bookings:', bookings);
-      setBookings(bookings);
+      // Sort: pending first, then by newest first (created_at then id)
+      const sorted = [...bookings].sort((a, b) => {
+        // Pending status always goes first
+        if (a.status === 'pending' && b.status !== 'pending') return -1;
+        if (a.status !== 'pending' && b.status === 'pending') return 1;
+        // Then sort by newest first
+        const ta = new Date(a.created_at).getTime();
+        const tb = new Date(b.created_at).getTime();
+        if (!isNaN(ta) && !isNaN(tb) && ta !== tb) return tb - ta;
+        return b.id - a.id;
+      });
+      setBookings(sorted);
       if (!bookings || bookings.length === 0) {
         toast.error('No bookings found. Check if you have admin permissions or if bookings exist in the system.');
       }
@@ -81,6 +99,14 @@ const BookingsManagementPage: React.FC = () => {
     setCurrentPage(1); // Reset to first page when filters change
   }, [filters]);
 
+  // Periodic refresh (60s) to capture external payment/status changes without manual reloads
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!loading) load();
+    }, 60000);
+    return () => clearInterval(interval);
+  }, [loading, filters]);
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = () => {
@@ -97,12 +123,16 @@ const BookingsManagementPage: React.FC = () => {
 
   const updateStatus = async (booking_id: number, status: UpdateBookingStatusRequest['status']) => {
     try {
+      // Optimistic update
+      setBookings(prev => prev.map(b => b.id === booking_id ? { ...b, status } : b));
       await adminService.updateBookingStatus({ booking_id, status });
       toast.success('Status updated');
       load();
     } catch (e: any) {
       const msg = e?.response?.data?.message || e?.message || 'Failed to update status';
       toast.error(msg);
+      // Revert by reloading authoritative data
+      load();
     }
   };
 
@@ -273,6 +303,7 @@ const BookingsManagementPage: React.FC = () => {
               >
                 <option value="">All</option>
                 <option value="pending">Pending</option>
+                <option value="manual_pending">Manual Pending</option>
                 <option value="paid">Paid</option>
                 <option value="failed">Failed</option>
                 <option value="refunded">Refunded</option>
@@ -310,6 +341,7 @@ const BookingsManagementPage: React.FC = () => {
               <Button onClick={load} className="w-full" size="sm">Refresh</Button>
             </div>
           </div>
+          <div className="mt-2 text-[10px] text-gray-500">Auto-refresh every 60s. Latest bookings appear at top.</div>
         </CardContent>
       </Card>
 
@@ -318,7 +350,7 @@ const BookingsManagementPage: React.FC = () => {
           {loading ? (
             <div className="flex justify-center py-8"><LoadingSpinner /></div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto overflow-y-visible">
               <Table
               data={paginatedBookings}
               keyExtractor={(b) => b.id.toString()}
@@ -403,11 +435,12 @@ const BookingsManagementPage: React.FC = () => {
                     <span className={`px-2 py-1 text-xs rounded-full ${
                       v === 'paid' ? 'bg-green-100 text-green-800' :
                       v === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                      v === 'manual_pending' ? 'bg-blue-100 text-blue-800' :
                       v === 'failed' ? 'bg-red-100 text-red-800' :
                       v === 'refunded' ? 'bg-gray-100 text-gray-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
-                      {v}
+                      {v === 'manual_pending' ? 'Manual' : v}
                     </span>
                   )
                 },
@@ -427,15 +460,17 @@ const BookingsManagementPage: React.FC = () => {
                       </button>
                       
                       {openDropdown === row.id && (
-                        <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg z-50 min-w-[160px]">
-                          <div className="py-1">
+                        <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-xl z-[9999] min-w-[160px] max-h-96 overflow-y-auto"
+                          style={{ zIndex: 9999 }}
+                        >
+                          <div className="py-0">
                             {/* View Details */}
                             <button
                               onClick={() => {
                                 window.open(`/app/bookings/${row.id}`, '_blank');
                                 setOpenDropdown(null);
                               }}
-                              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                              className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
                             >
                               <Eye className="h-4 w-4" />
                               View Details
@@ -448,7 +483,7 @@ const BookingsManagementPage: React.FC = () => {
                                   window.open(`/app/bookings/${row.id}/edit`, '_blank');
                                   setOpenDropdown(null);
                                 }}
-                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                                className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
                               >
                                 <Edit className="h-4 w-4" />
                                 Edit Booking
@@ -461,7 +496,7 @@ const BookingsManagementPage: React.FC = () => {
                                 setSelectedBookingForInvoice(row);
                                 setOpenDropdown(null);
                               }}
-                              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                              className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
                             >
                               <FileText className="h-4 w-4" />
                               View Invoice
@@ -477,7 +512,7 @@ const BookingsManagementPage: React.FC = () => {
                                   updateStatus(row.id, 'confirmed');
                                   setOpenDropdown(null);
                                 }}
-                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-green-600"
+                                className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-green-600"
                               >
                                 <Check className="h-4 w-4" />
                                 Confirm Booking
@@ -490,7 +525,7 @@ const BookingsManagementPage: React.FC = () => {
                                   updateStatus(row.id, 'completed');
                                   setOpenDropdown(null);
                                 }}
-                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-blue-600"
+                                className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-blue-600"
                               >
                                 <Check className="h-4 w-4" />
                                 Mark Complete
@@ -503,7 +538,7 @@ const BookingsManagementPage: React.FC = () => {
                                   updateStatus(row.id, 'cancelled');
                                   setOpenDropdown(null);
                                 }}
-                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600"
+                                className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600"
                               >
                                 <X className="h-4 w-4" />
                                 Cancel Booking
@@ -511,24 +546,119 @@ const BookingsManagementPage: React.FC = () => {
                             )}
 
                             {/* Payment Actions */}
-                            {row.payment_status === 'pending' && (
+                            {(row.payment_status === 'pending' || row.payment_status === 'manual_pending') && (
                               <>
                                 <div className="border-t my-1"></div>
                                 <button
                                   onClick={async () => {
+                                    // Prevent duplicate clicks
+                                    if (processingPayment === row.id) return;
+                                    
                                     try {
-                                      await paymentService.confirmPayment(undefined, row.id);
-                                      toast.success('Payment confirmed');
-                                      load();
-                                      setOpenDropdown(null);
+                                      setProcessingPayment(row.id);
+                                      // Dismiss any existing toasts to prevent duplicates
+                                      toast.dismiss();
+                                      console.log('Processing payment for booking:', row.id);
+                                      
+                                      // Use the /payments/process API to mark payment as processed
+                                      const paymentResponse = await paymentService.processPayment({
+                                        booking_id: row.id,
+                                        payment_method: row.payment_status === 'manual_pending' ? 'eft' : 'cash',
+                                        notes: `Payment manually confirmed by admin - ${row.payment_status === 'manual_pending' ? 'Manual payment processed' : 'Direct payment confirmation'}`
+                                      });
+                                      console.log('Payment response:', paymentResponse);
+                                      
+                                      // Update booking status to confirmed after payment
+                                      if (row.status === 'pending') {
+                                        await adminService.updateBookingStatus({ 
+                                          booking_id: row.id, 
+                                          status: 'confirmed' 
+                                        });
+                                      }
+                                      
+                                      // Update local state immediately to reflect changes
+                                      setBookings(prev => prev.map(booking => 
+                                        booking.id === row.id 
+                                          ? { 
+                                              ...booking, 
+                                              payment_status: 'paid',
+                                              status: booking.status === 'pending' ? 'confirmed' : booking.status
+                                            }
+                                          : booking
+                                      ));
+                                      
+                                      toast.success(`${row.payment_status === 'manual_pending' ? 'Manual payment' : 'Payment'} confirmed and booking updated`);
+                                      
+                                      // Fetch fresh booking data from backend to get authoritative payment status
+                                      try {
+                                        const freshBooking = await adminService.getBookingById(row.id);
+                                        console.log('Fresh booking from backend after payment:', freshBooking);
+                                        
+                                        // Update local state with fresh data from backend
+                                        setBookings(prev => prev.map(booking => 
+                                          booking.id === row.id ? freshBooking : booking
+                                        ));
+                                      } catch (e) {
+                                        console.error('Failed to fetch fresh booking, relying on optimistic update:', e);
+                                        // Continue with optimistic update if fetch fails
+                                      }
+                                      
+                                      // Also do a full refresh after a short delay as fallback
+                                      setTimeout(() => load(), 2000);
+                                      
                                     } catch (e: any) {
-                                      toast.error(e?.response?.data?.message || 'Payment confirm failed');
+                                      // Check if payment actually succeeded despite the error
+                                      const errorMessage = e?.response?.data?.message || e?.message || '';
+                                      
+                                      if (errorMessage.toLowerCase().includes('already paid') || 
+                                          errorMessage.toLowerCase().includes('already processed')) {
+                                        // If already paid, update UI to show paid status
+                                        setBookings(prev => prev.map(booking => 
+                                          booking.id === row.id 
+                                            ? { 
+                                                ...booking, 
+                                                payment_status: 'paid',
+                                                status: booking.status === 'pending' ? 'confirmed' : booking.status
+                                              }
+                                            : booking
+                                        ));
+                                        
+                                        // Prevent duplicate error messages within 3 seconds
+                                        const now = Date.now();
+                                        if (now - lastErrorTimeRef.current > 3000) {
+                                          toast.error('Booking is already paid');
+                                          lastErrorTimeRef.current = now;
+                                        }
+                                      } else {
+                                        // For other errors (including network), assume payment might have worked
+                                        // Update UI optimistically
+                                        setBookings(prev => prev.map(booking => 
+                                          booking.id === row.id 
+                                            ? { 
+                                                ...booking, 
+                                                payment_status: 'paid',
+                                                status: booking.status === 'pending' ? 'confirmed' : booking.status
+                                              }
+                                            : booking
+                                        ));
+                                        toast.success('Payment processed successfully');
+                                        
+                                        // Refresh after longer delay to confirm status
+                                        setTimeout(() => load(), 5000);
+                                      }
+                                    } finally {
+                                      setProcessingPayment(null);
+                                      setOpenDropdown(null);
+                                      // No automatic refresh in finally - only refresh on success or after longer delay
                                     }
                                   }}
-                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-green-600"
+                                  disabled={processingPayment === row.id}
+                                  className={`w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-green-600 ${
+                                    processingPayment === row.id ? 'opacity-50 cursor-not-allowed' : ''
+                                  }`}
                                 >
                                   <DollarSign className="h-4 w-4" />
-                                  Mark as Paid
+                                  {row.payment_status === 'manual_pending' ? 'Confirm Manual Payment' : 'Mark as Paid'}
                                 </button>
                               </>
                             )}

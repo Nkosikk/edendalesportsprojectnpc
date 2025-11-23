@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Clock, Plus, Filter, FileText } from 'lucide-react';
+import { Calendar, Clock, Plus, Filter, FileText, Banknote } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { bookingService } from '../../services/bookingService';
+// paymentService unused; removed import to satisfy TS
 import type { BookingDetails } from '../../types';
 import { formatDate, formatTime, formatCurrency } from '../../lib/utils';
 import PayButton from '../../components/payments/PayButton';
@@ -83,6 +84,8 @@ const BookingsPage = () => {
     }
   );
 
+  const [showPaymentInstructions, setShowPaymentInstructions] = useState<number | null>(null);
+
   const handleCancelBooking = (bookingId: number) => {
     // Prevent duplicate cancellations (handles React StrictMode double execution)
     if (cancellingRef.current.has(bookingId)) return;
@@ -91,6 +94,10 @@ const BookingsPage = () => {
       cancellingRef.current.add(bookingId);
       cancelMutation.mutate({ bookingId, reason: 'Cancelled by user' });
     }
+  };
+
+  const handleManualPayment = (bookingId: number) => {
+    setShowPaymentInstructions(bookingId);
   };  const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed':
@@ -240,6 +247,10 @@ const BookingsPage = () => {
                       <span className="px-2 py-1 text-[10px] font-semibold rounded-full bg-yellow-100 text-yellow-700">
                         PAYMENT PENDING
                       </span>
+                    ) : booking.payment_status === 'manual_pending' ? (
+                      <span className="px-2 py-1 text-[10px] font-semibold rounded-full bg-blue-100 text-blue-700">
+                        MANUAL PAYMENT
+                      </span>
                     ) : null}
                   </div>
                 </div>
@@ -267,30 +278,45 @@ const BookingsPage = () => {
                       {formatCurrency(booking.total_amount)}
                     </span>
                   </div>
-                  <div className="flex space-x-2">
-                    <Link to={`/app/bookings/${booking.id}`} className="flex-1">
+                  <div className="flex flex-wrap gap-2">
+                    <Link to={`/app/bookings/${booking.id}`} className="flex-1 min-w-[100px]">
                       <Button variant="outline" size="sm" className="w-full">
                         View Details
                       </Button>
                     </Link>
                     {(booking.status === 'pending' || booking.status === 'confirmed') && (
-                      <Link to={`/app/bookings/${booking.id}/edit`} className="flex-1">
+                      <Link to={`/app/bookings/${booking.id}/edit`} className="flex-1 min-w-[80px]">
                         <Button variant="outline" size="sm" className="w-full">
                           Edit
                         </Button>
                       </Link>
                     )}
                     <Link to={`/app/invoices/${booking.id}`} title="View Invoice">
-                      <Button variant="outline" size="sm">
-                        <FileText className="h-4 w-4" />
+                      <Button status="info" size="sm" icon={FileText}>
+                        Invoice
                       </Button>
                     </Link>
                     {booking.status === 'pending' && booking.payment_status === 'pending' && (
-                      <PayButton bookingId={booking.id} label="Pay" />
+                      <>
+                        <PayButton bookingId={booking.id} label="Pay Online" />
+                        <Button
+                          status="pending"
+                          size="sm"
+                          onClick={() => handleManualPayment(booking.id)}
+                          icon={Banknote}
+                        >
+                          Manual Pay
+                        </Button>
+                      </>
+                    )}
+                    {booking.status === 'pending' && booking.payment_status === 'manual_pending' && (
+                      <span className="text-xs text-blue-600 font-medium px-2 py-1 bg-blue-50 rounded whitespace-nowrap">
+                        Awaiting proof of payment
+                      </span>
                     )}
                     {booking.status === 'pending' && (
                       <Button
-                        variant="error"
+                        status="cancelled"
                         size="sm"
                         onClick={() => handleCancelBooking(booking.id)}
                         disabled={cancellingRef.current.has(booking.id)}
@@ -302,6 +328,64 @@ const BookingsPage = () => {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Payment Instructions Modal */}
+        {showPaymentInstructions && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Manual Payment Instructions</h3>
+                <button
+                  onClick={() => setShowPaymentInstructions(null)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="space-y-4 text-sm">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-blue-900 mb-2">Banking Details</h4>
+                  <div className="space-y-1 text-blue-800">
+                    <p><strong>Bank:</strong> Capitec</p>
+                    <p><strong>Branch Code:</strong> 470010</p>
+                    <p><strong>Account Name:</strong> Edendale Sports Projects NPC</p>
+                    <p><strong>Account Number:</strong> 1234567890</p>
+                  </div>
+                </div>
+
+                <div className="bg-yellow-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-yellow-900 mb-2">Payment Reference</h4>
+                  <p className="text-yellow-800">
+                    <strong>Use your name as reference:</strong> {user?.first_name} {user?.last_name}
+                  </p>
+                </div>
+
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-green-900 mb-2">Proof of Payment</h4>
+                  <p className="text-green-800">
+                    Send proof of payment to: <strong>edendale@gmail.com</strong>
+                  </p>
+                </div>
+
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <h4 className="font-medium text-gray-900 mb-2">Important Notes</h4>
+                  <ul className="text-gray-700 text-xs space-y-1 list-disc list-inside">
+                    <li>Your booking will remain pending until payment is confirmed</li>
+                    <li>Include your booking reference in the email</li>
+                    <li>Payment confirmation may take 1-2 business days</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end">
+                <Button onClick={() => setShowPaymentInstructions(null)}>
+                  Got it
+                </Button>
+              </div>
+            </div>
           </div>
         )}
 
