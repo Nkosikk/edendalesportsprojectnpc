@@ -26,7 +26,7 @@ export const FieldUtilizationBar: React.FC<{ data: FieldUtilizationDatum[] }> = 
       },
       {
         label: 'Utilization %',
-        data: top.map(d => Number(d.utilization_percentage.toFixed(2))),
+        data: top.map(d => Number((d.utilization_percentage || 0).toFixed(2))),
         backgroundColor: '#10b981',
         maxBarThickness: 18
       }

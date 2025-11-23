@@ -155,7 +155,7 @@ const FieldAvailabilityPage: React.FC = () => {
                       <div className="font-medium text-gray-900">
                         {slot.start_time} - {slot.end_time}
                       </div>
-                      <div className="text-sm text-gray-500">R {slot.price.toFixed(2)}</div>
+                      <div className="text-sm text-gray-500">R {Number(slot.price || 0).toFixed(2)}</div>
                     </div>
                     {slot.available ? (
                       <Button

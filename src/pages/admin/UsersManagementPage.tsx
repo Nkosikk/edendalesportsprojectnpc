@@ -8,6 +8,7 @@ import { Badge, getStatusBadgeVariant } from '../../components/ui/Badge';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Modal } from '../../components/ui/Modal';
 import toast from 'react-hot-toast';
+import { MoreVertical } from 'lucide-react';
 
 const UsersManagementPage: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);
@@ -28,13 +29,28 @@ const UsersManagementPage: React.FC = () => {
     }
   };
 
-  useEffect(() => { load(); }, [filters]);
-
   const [roleModalOpen, setRoleModalOpen] = useState(false);
   const [targetUser, setTargetUser] = useState<User | null>(null);
   const [targetRole, setTargetRole] = useState<UpdateUserRoleRequest['role']>('customer');
   const [reason, setReason] = useState('');
   const [updatingRole, setUpdatingRole] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState<number | null>(null);
+
+  useEffect(() => { load(); }, [filters]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (openDropdown !== null) {
+        setOpenDropdown(null);
+      }
+    };
+    
+    if (openDropdown !== null) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [openDropdown]);
 
   const openRoleModal = (user: User, role: UpdateUserRoleRequest['role']) => {
     setTargetUser(user);
@@ -59,12 +75,14 @@ const UsersManagementPage: React.FC = () => {
   };
 
   const changeStatus = async (id: number, is_active: boolean) => {
+    console.log(`Changing user ${id} status to: ${is_active ? 'ACTIVE' : 'INACTIVE'}`);
     try {
       await adminService.updateUserStatus(id, { is_active });
-      toast.success('Status updated');
-      load();
-    } catch {
-      toast.error('Failed to update status');
+      toast.success(`User ${is_active ? 'activated' : 'deactivated'} successfully`);
+      load(); // Reload the user list
+    } catch (error: any) {
+      console.error('Failed to update user status:', error);
+      toast.error(error?.response?.data?.message || 'Failed to update status');
     }
   };
 
@@ -124,20 +142,83 @@ const UsersManagementPage: React.FC = () => {
             {
               key: 'is_active',
               title: 'Active',
-              render: (v: boolean, row: User) => (
-                <Button size="sm" variant={v ? 'secondary' : 'primary'} onClick={() => changeStatus(row.id, !v)}>
-                  {v ? 'Deactivate' : 'Activate'}
-                </Button>
-              ),
+              render: (v: boolean, row: User) => {
+                const isActive = Boolean(v);
+                
+                return (
+                  <Button 
+                    size="sm" 
+                    variant={isActive ? 'secondary' : 'primary'} 
+                    onClick={() => changeStatus(row.id, !isActive)}
+                  >
+                    {isActive ? 'Deactivate' : 'Activate'}
+                  </Button>
+                );
+              },
             },
             {
               key: 'actions',
-              title: 'Actions',
+              title: 'ACTIONS',
               render: (_: any, row: User) => (
-                <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="outline" onClick={() => openRoleModal(row, 'admin')}>Promote Admin</Button>
-                  <Button size="sm" variant="outline" onClick={() => openRoleModal(row, 'staff')}>Set Staff</Button>
-                  <Button size="sm" variant="outline" onClick={() => openRoleModal(row, 'customer')}>Set Customer</Button>
+                <div className="relative inline-block text-left">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      console.log('Clicked dropdown for user:', row.id, 'Current open:', openDropdown);
+                      setOpenDropdown(openDropdown === row.id ? null : row.id);
+                    }}
+                    className="inline-flex items-center justify-center w-8 h-8 rounded border border-gray-300 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    aria-expanded={openDropdown === row.id}
+                    aria-haspopup="true"
+                  >
+                    <MoreVertical className="h-4 w-4 text-gray-400" />
+                  </button>
+
+                  {openDropdown === row.id && (
+                    <>
+                      <div 
+                        className="fixed inset-0 z-40"
+                        onClick={() => setOpenDropdown(null)}
+                      />
+                      <div className="origin-top-right absolute right-0 mt-2 w-56 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
+                        <div className="py-1" role="menu">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openRoleModal(row, 'admin');
+                              setOpenDropdown(null);
+                            }}
+                            className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 hover:text-gray-900 w-full text-left"
+                            role="menuitem"
+                          >
+                            Promote Admin
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openRoleModal(row, 'staff');
+                              setOpenDropdown(null);
+                            }}
+                            className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 hover:text-gray-900 w-full text-left"
+                            role="menuitem"
+                          >
+                            Set Staff
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openRoleModal(row, 'customer');
+                              setOpenDropdown(null);
+                            }}
+                            className="text-gray-700 block px-4 py-2 text-sm hover:bg-gray-100 hover:text-gray-900 w-full text-left"
+                            role="menuitem"
+                          >
+                            Set Customer
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               )
             },

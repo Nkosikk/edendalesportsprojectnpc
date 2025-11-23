@@ -190,7 +190,7 @@ const HomePage = () => {
                                   <span className="text-xs text-gray-500">Unavailable</span>
                                 )}
                               </div>
-                              <div className="text-sm text-gray-600 mb-2">R {slot.price.toFixed(2)}</div>
+                              <div className="text-sm text-gray-600 mb-2">R {Number(slot.price || 0).toFixed(2)}</div>
                               {slot.available ? (
                                 <Button size="sm" onClick={() => handleBook(slot)} className="w-full">Book Now</Button>
                               ) : null}
@@ -240,7 +240,7 @@ const HomePage = () => {
                     <CardTitle className="flex items-center justify-between text-base">
                       <span className="font-semibold">{f.name}</span>
                       <span className="bg-primary-100 text-primary-700 px-2 py-1 rounded-full text-xs font-semibold">
-                        R {f.hourly_rate.toFixed(2)}/hr
+                        R {Number(f.hourly_rate || 0).toFixed(2)}/hr
                       </span>
                     </CardTitle>
                   </CardHeader>

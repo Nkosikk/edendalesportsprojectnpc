@@ -210,7 +210,7 @@ const CreateBookingPage = () => {
                   const rate = fieldId ? (fields?.find(f => f.id === fieldId)?.hourly_rate ?? undefined) : undefined;
                   return (
                     <div>
-                      <span className="font-medium">Cost{rate ? ` (R${Number(rate).toFixed(0)}/h)` : ''}:</span> {startTime ? `R${cost.toFixed(2)}` : '—'}
+                      <span className="font-medium">Cost{rate ? ` (R${Number(rate).toFixed(0)}/h)` : ''}:</span> {startTime ? `R${Number(cost || 0).toFixed(2)}` : '—'}
                     </div>
                   );
                 })()}

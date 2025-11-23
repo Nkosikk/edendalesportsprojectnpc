@@ -29,7 +29,10 @@ const BookingDetailsPage = () => {
   const { data: booking, isLoading, error } = useQuery<BookingDetails>(
     ['booking', bookingId],
     () => bookingService.getBookingById(bookingId),
-    { enabled: Number.isFinite(bookingId) }
+    { 
+      enabled: !!id && !isNaN(bookingId) && bookingId > 0,
+      retry: 1
+    }
   );
 
   const handleCancelBooking = async () => {
@@ -68,6 +71,20 @@ const BookingDetailsPage = () => {
     }
   };
 
+  // Invalid booking ID
+  if (!id || isNaN(bookingId) || bookingId <= 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white shadow rounded-lg p-6 text-center">
+          <p className="text-error-600 mb-4">Invalid booking ID in URL.</p>
+          <Link to="/app/bookings">
+            <Button variant="outline" icon={ArrowLeft}>Back to Bookings</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -80,7 +97,9 @@ const BookingDetailsPage = () => {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white shadow rounded-lg p-6 text-center">
-          <p className="text-error-600 mb-4">Failed to load booking details.</p>
+          <p className="text-error-600 mb-4">
+            {error ? 'Failed to load booking details.' : 'Booking not found.'}
+          </p>
           <Link to="/app/bookings">
             <Button variant="outline" icon={ArrowLeft}>Back to Bookings</Button>
           </Link>
@@ -103,8 +122,8 @@ const BookingDetailsPage = () => {
         <div className="card">
           <div className="flex items-start justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Booking #{booking.id}</h1>
-              <p className="text-gray-600 mt-1">{booking.field_name}</p>
+              <h1 className="text-2xl font-bold text-gray-900">Booking #{booking.id || '—'}</h1>
+              <p className="text-gray-600 mt-1">{booking.field_name || 'Unknown Field'}</p>
             </div>
             <span className={`px-2 py-1 text-xs font-medium rounded-full ${
               booking.status === 'confirmed' ? 'bg-success-100 text-success-800' :
@@ -123,7 +142,7 @@ const BookingDetailsPage = () => {
               </div>
               <div className="flex items-center text-gray-700 mb-2">
                 <Clock className="h-4 w-4 mr-2" />
-                <span>{formatTime(booking.start_time)} - {formatTime(booking.end_time)}</span>
+                <span>{booking.start_time ? formatTime(booking.start_time) : '—'} - {booking.end_time ? formatTime(booking.end_time) : '—'}</span>
               </div>
               <div className="text-sm text-gray-500">
                 <div className="mb-1">

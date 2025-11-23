@@ -99,6 +99,11 @@ export const adminService = {
       const role = u.role ?? u.role_name ?? 'customer';
       const isActiveRaw = u.is_active;
       const emailVerifiedRaw = u.email_verified;
+      
+      // Handle different possible values for is_active: 1, '1', true = active; 0, '0', false = inactive
+      const isActive = isActiveRaw === 1 || isActiveRaw === '1' || isActiveRaw === true;
+      const emailVerified = emailVerifiedRaw === 1 || emailVerifiedRaw === '1' || emailVerifiedRaw === true;
+      
       return {
         id: Number(u.id),
         first_name: String(u.first_name ?? ''),
@@ -106,8 +111,8 @@ export const adminService = {
         email: String(u.email ?? ''),
         phone: u.phone ? String(u.phone) : undefined,
         role: role,
-        is_active: isActiveRaw === true || isActiveRaw === 1 || isActiveRaw === '1',
-        email_verified: emailVerifiedRaw === true || emailVerifiedRaw === 1 || emailVerifiedRaw === '1',
+        is_active: isActive,
+        email_verified: emailVerified,
         last_login: u.last_login ?? undefined,
         created_at: u.created_at ?? new Date().toISOString(),
         updated_at: u.updated_at ?? u.created_at ?? new Date().toISOString(),

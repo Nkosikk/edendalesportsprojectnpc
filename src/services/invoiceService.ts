@@ -1,5 +1,6 @@
 import { BookingDetails } from '../types';
 import { apiClient, handleApiResponse } from '../lib/api';
+import { safeNumber } from '../lib/utils';
 
 export interface EmailInvoiceRequest {
   booking_id: number;
@@ -163,28 +164,29 @@ class InvoiceService {
   /**
    * Format invoice number
    */
-  formatInvoiceNumber(bookingReference: string, customPrefix?: string): string {
+  formatInvoiceNumber(bookingReference: string | null | undefined, customPrefix?: string): string {
     const prefix = customPrefix || 'INV';
     const timestamp = new Date().getFullYear().toString().slice(-2) + 
                      (new Date().getMonth() + 1).toString().padStart(2, '0');
-    return `${prefix}-${timestamp}-${bookingReference}`;
+    const ref = bookingReference || 'UNKNOWN';
+    return `${prefix}-${timestamp}-${ref}`;
   }
 
   /**
    * Calculate invoice totals including VAT
    */
-  calculateInvoiceTotals(totalAmount: number, vatRate: number = 0.15) {
-    const subtotal = totalAmount;
+  calculateInvoiceTotals(totalAmount: number | null | undefined, vatRate: number = 0.15) {
+    const subtotal = safeNumber(totalAmount);
     const vat = subtotal * vatRate;
     const total = subtotal + vat;
 
     return {
-      subtotal,
-      vat,
+      subtotal: safeNumber(subtotal.toFixed(2)),
+      vat: safeNumber(vat.toFixed(2)),
       vatRate,
-      total,
-      totalExclVat: subtotal,
-      totalInclVat: total
+      total: safeNumber(total.toFixed(2)),
+      totalExclVat: safeNumber(subtotal.toFixed(2)),
+      totalInclVat: safeNumber(total.toFixed(2))
     };
   }
 

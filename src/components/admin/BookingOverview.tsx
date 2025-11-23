@@ -17,11 +17,11 @@ interface BookingOverviewProps {
 }
 
 const statConfig: { key: keyof BookingOverviewMetrics; label: string; format?: (v: number) => string }[] = [
-  { key: 'total_revenue', label: 'Total Revenue', format: v => `R ${v.toFixed(2)}` },
+  { key: 'total_revenue', label: 'Total Revenue', format: v => `R ${Number(v || 0).toFixed(2)}` },
   { key: 'total_bookings', label: 'Total Bookings' },
   { key: 'confirmed_bookings', label: 'Confirmed' },
   { key: 'pending_payments', label: 'Pending Payments' },
-  { key: 'total_hours', label: 'Total Hours', format: v => v.toFixed(1) },
+  { key: 'total_hours', label: 'Total Hours', format: v => Number(v || 0).toFixed(1) },
   { key: 'total_users', label: 'Users' },
 ];
 

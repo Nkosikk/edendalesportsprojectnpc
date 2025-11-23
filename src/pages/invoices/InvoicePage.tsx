@@ -19,7 +19,10 @@ const InvoicePage: React.FC = () => {
   const { data: booking, isLoading, error } = useQuery<BookingDetails>(
     ['booking', bookingId],
     () => bookingService.getBookingById(bookingId),
-    { enabled: Number.isFinite(bookingId) }
+    { 
+      enabled: !!id && !isNaN(bookingId) && bookingId > 0,
+      retry: 1
+    }
   );
 
   const handleDownload = async () => {
@@ -50,6 +53,20 @@ const InvoicePage: React.FC = () => {
     }
   };
 
+  // Invalid booking ID
+  if (!id || isNaN(bookingId) || bookingId <= 0) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="max-w-md w-full bg-white shadow rounded-lg p-6 text-center">
+          <p className="text-error-600 mb-4">Invalid booking ID in URL.</p>
+          <Link to="/app/bookings">
+            <Button variant="outline" icon={ArrowLeft}>Back to Bookings</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -62,7 +79,9 @@ const InvoicePage: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white shadow rounded-lg p-6 text-center">
-          <p className="text-error-600 mb-4">Failed to load invoice.</p>
+          <p className="text-error-600 mb-4">
+            {error ? 'Failed to load invoice.' : 'Booking not found.'}
+          </p>
           <Link to="/app/bookings">
             <Button variant="outline" icon={ArrowLeft}>Back to Bookings</Button>
           </Link>

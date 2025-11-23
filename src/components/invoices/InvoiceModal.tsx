@@ -23,9 +23,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const [emailSending, setEmailSending] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [emailData, setEmailData] = useState({
-    recipient: booking.email,
-    subject: `Invoice for Booking ${booking.booking_reference}`,
-    message: `Dear ${booking.first_name},\n\nPlease find attached your invoice for the sports facility booking.\n\nBooking Details:\n- Field: ${booking.field_name}\n- Date: ${booking.booking_date}\n- Time: ${booking.start_time} - ${booking.end_time}\n\nThank you for choosing our facility.\n\nBest regards,\nEdendale Sports Complex`
+    recipient: booking?.email || '',
+    subject: `Invoice for Booking ${booking?.booking_reference || 'N/A'}`,
+    message: `Dear ${booking?.first_name || 'Customer'},\n\nPlease find attached your invoice for the sports facility booking.\n\nBooking Details:\n- Field: ${booking?.field_name || 'N/A'}\n- Date: ${booking?.booking_date || 'N/A'}\n- Time: ${booking?.start_time || 'N/A'} - ${booking?.end_time || 'N/A'}\n\nThank you for choosing our facility.\n\nBest regards,\nEdendale Sports Complex`
   });
 
   const handleDownload = async () => {
@@ -65,7 +65,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   };
 
   const validation = invoiceService.validateInvoiceData(booking);
-  const invoiceTotals = invoiceService.calculateInvoiceTotals(booking.total_amount);
+  const invoiceTotals = invoiceService.calculateInvoiceTotals(booking?.total_amount);
   const invoiceStatus = invoiceService.getInvoiceStatus(booking);
 
   if (!validation.isValid) {
@@ -91,7 +91,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         <div className="border rounded-lg p-4 max-h-96 overflow-y-auto">
           <InvoiceGenerator 
             booking={booking}
-            invoiceNumber={invoiceService.formatInvoiceNumber(booking.booking_reference)}
+            invoiceNumber={invoiceService.formatInvoiceNumber(booking?.booking_reference)}
           />
         </div>
 
@@ -100,14 +100,14 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
           <h4 className="font-medium text-gray-900 mb-3">Invoice Summary</h4>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p><span className="text-gray-600">Invoice #:</span> {invoiceService.formatInvoiceNumber(booking.booking_reference)}</p>
+              <p><span className="text-gray-600">Invoice #:</span> {invoiceService.formatInvoiceNumber(booking?.booking_reference)}</p>
               <p><span className="text-gray-600">Status:</span> <span className={invoiceStatus.statusColor}>{invoiceStatus.statusText}</span></p>
-              <p><span className="text-gray-600">Customer:</span> {booking.first_name} {booking.last_name}</p>
+              <p><span className="text-gray-600">Customer:</span> {booking?.first_name || ''} {booking?.last_name || ''}</p>
             </div>
             <div className="text-right">
-              <p><span className="text-gray-600">Subtotal:</span> R{invoiceTotals.subtotal.toFixed(2)}</p>
-              <p><span className="text-gray-600">VAT (15%):</span> R{invoiceTotals.vat.toFixed(2)}</p>
-              <p className="font-medium"><span className="text-gray-600">Total:</span> R{invoiceTotals.total.toFixed(2)}</p>
+              <p><span className="text-gray-600">Subtotal:</span> R{(invoiceTotals.subtotal || 0).toFixed(2)}</p>
+              <p><span className="text-gray-600">VAT (15%):</span> R{(invoiceTotals.vat || 0).toFixed(2)}</p>
+              <p className="font-medium"><span className="text-gray-600">Total:</span> R{(invoiceTotals.total || 0).toFixed(2)}</p>
             </div>
           </div>
         </div>

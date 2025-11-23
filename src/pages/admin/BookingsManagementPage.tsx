@@ -9,7 +9,7 @@ import { formatCurrency } from '../../lib/utils';
 import { Card, CardContent } from '../../components/ui/Card';
 import InvoiceModal from '../../components/invoices/InvoiceModal';
 import toast from 'react-hot-toast';
-import { FileText } from 'lucide-react';
+import { FileText, MoreVertical, Eye, Edit, Check, X, DollarSign } from 'lucide-react';
 
 const BookingsManagementPage: React.FC = () => {
   const [bookings, setBookings] = useState<BookingDetails[]>([]);
@@ -18,6 +18,7 @@ const BookingsManagementPage: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
   const [selectedBookingForInvoice, setSelectedBookingForInvoice] = useState<BookingDetails | null>(null);
+  const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   // Keep track of rows we already auto-completed to avoid duplicate updates
   const autoCompletedRef = React.useRef<Set<number>>(new Set());
   const autoAttemptedRef = React.useRef<Set<number>>(new Set());
@@ -79,6 +80,20 @@ const BookingsManagementPage: React.FC = () => {
     load(); 
     setCurrentPage(1); // Reset to first page when filters change
   }, [filters]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      if (openDropdown !== null) {
+        setOpenDropdown(null);
+      }
+    };
+    
+    if (openDropdown !== null) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [openDropdown]);
 
   const updateStatus = async (booking_id: number, status: UpdateBookingStatusRequest['status']) => {
     try {
@@ -209,8 +224,8 @@ const BookingsManagementPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6 flex justify-between items-center">
+    <div className="container mx-auto px-2 sm:px-4 py-8 max-w-full">
+      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold text-gray-900">Bookings Management</h1>
         <div className="flex gap-2">
           <Button 
@@ -303,118 +318,229 @@ const BookingsManagementPage: React.FC = () => {
           {loading ? (
             <div className="flex justify-center py-8"><LoadingSpinner /></div>
           ) : (
-            <Table
+            <div className="overflow-x-auto">
+              <Table
               data={paginatedBookings}
               keyExtractor={(b) => b.id.toString()}
               columns={[
-                { key: 'booking_reference', title: 'Reference' },
+                { 
+                  key: 'booking_reference', 
+                  title: 'Ref#',
+                  render: (v: string) => (
+                    <div className="text-xs font-mono">{v}</div>
+                  )
+                },
                 { 
                   key: 'customer', 
                   title: 'Customer', 
                   render: (_: any, r: BookingDetails) => (
-                    <div>
-                      <div className="font-medium">{`${r.first_name} ${r.last_name}`}</div>
-                      <div className="text-xs text-gray-500">{r.email}</div>
+                    <div className="min-w-0">
+                      <div className="font-medium text-sm truncate">{`${r.first_name} ${r.last_name}`}</div>
+                      <div className="text-xs text-gray-500 truncate">{r.email}</div>
                       {r.notes && (
-                        <div className="text-xs text-blue-600 mt-1" title={r.notes}>
-                          📝 {r.notes.length > 30 ? r.notes.substring(0, 30) + '...' : r.notes}
+                        <div className="text-xs text-blue-600 mt-1 truncate" title={r.notes}>
+                          📝 {r.notes.length > 20 ? r.notes.substring(0, 20) + '...' : r.notes}
                         </div>
                       )}
                     </div>
                   )
                 },
-                { key: 'field_name', title: 'Field' },
-                { key: 'booking_date', title: 'Date' },
-                { key: 'start_time', title: 'Start' },
-                { key: 'end_time', title: 'End' },
+                { 
+                  key: 'field_name', 
+                  title: 'Field',
+                  render: (v: string) => (
+                    <div className="text-sm truncate max-w-[120px]" title={v}>{v}</div>
+                  )
+                },
+                { 
+                  key: 'booking_date', 
+                  title: 'Date',
+                  render: (v: string) => (
+                    <div className="text-xs">{v}</div>
+                  )
+                },
+                { 
+                  key: 'time_slot', 
+                  title: 'Time',
+                  render: (_: any, r: BookingDetails) => (
+                    <div className="text-xs">
+                      <div>{r.start_time.slice(0, 5)}</div>
+                      <div className="text-gray-500">{r.end_time.slice(0, 5)}</div>
+                    </div>
+                  )
+                },
                 { 
                   key: 'total_amount', 
                   title: 'Amount', 
                   render: (v: any) => {
                     const num = Number(v);
-                    return Number.isFinite(num) ? formatCurrency(num) : '—';
+                    return (
+                      <div className="text-sm font-medium">
+                        {Number.isFinite(num) ? formatCurrency(num) : '—'}
+                      </div>
+                    );
                   } 
                 },
-                { key: 'status', title: 'Status' },
-                { key: 'payment_status', title: 'Payment' },
+                { 
+                  key: 'status', 
+                  title: 'Status',
+                  render: (v: string) => (
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      v === 'confirmed' ? 'bg-green-100 text-green-800' :
+                      v === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                      v === 'completed' ? 'bg-blue-100 text-blue-800' :
+                      v === 'cancelled' ? 'bg-red-100 text-red-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {v}
+                    </span>
+                  )
+                },
+                { 
+                  key: 'payment_status', 
+                  title: 'Payment',
+                  render: (v: string) => (
+                    <span className={`px-2 py-1 text-xs rounded-full ${
+                      v === 'paid' ? 'bg-green-100 text-green-800' :
+                      v === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                      v === 'failed' ? 'bg-red-100 text-red-800' :
+                      v === 'refunded' ? 'bg-gray-100 text-gray-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {v}
+                    </span>
+                  )
+                },
                 {
                   key: 'actions',
                   title: 'Actions',
                   render: (_: any, row: BookingDetails) => (
-                    <div className="flex gap-1 flex-wrap">
-                      {/* View Details */}
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        onClick={() => window.open(`/app/bookings/${row.id}`, '_blank')}
+                    <div className="relative">
+                      <button 
+                        className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                        onClick={(e: React.MouseEvent) => {
+                          e.stopPropagation();
+                          setOpenDropdown(openDropdown === row.id ? null : row.id);
+                        }}
                       >
-                        View
-                      </Button>
+                        <MoreVertical className="h-4 w-4" />
+                      </button>
+                      
+                      {openDropdown === row.id && (
+                        <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-lg z-50 min-w-[160px]">
+                          <div className="py-1">
+                            {/* View Details */}
+                            <button
+                              onClick={() => {
+                                window.open(`/app/bookings/${row.id}`, '_blank');
+                                setOpenDropdown(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                            >
+                              <Eye className="h-4 w-4" />
+                              View Details
+                            </button>
 
-                      {/* Edit Booking (only for pending/confirmed) */}
-                      {(row.status === 'pending' || row.status === 'confirmed') && (
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          onClick={() => window.open(`/app/bookings/${row.id}/edit`, '_blank')}
-                        >
-                          Edit
-                        </Button>
-                      )}
+                            {/* Edit Booking */}
+                            {(row.status === 'pending' || row.status === 'confirmed') && (
+                              <button
+                                onClick={() => {
+                                  window.open(`/app/bookings/${row.id}/edit`, '_blank');
+                                  setOpenDropdown(null);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                              >
+                                <Edit className="h-4 w-4" />
+                                Edit Booking
+                              </button>
+                            )}
 
-                      {/* Invoice */}
-                      <div title="View/Send Invoice">
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          onClick={() => setSelectedBookingForInvoice(row)}
-                        >
-                          <FileText className="h-3 w-3" />
-                        </Button>
-                      </div>
+                            {/* Invoice */}
+                            <button
+                              onClick={() => {
+                                setSelectedBookingForInvoice(row);
+                                setOpenDropdown(null);
+                              }}
+                              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                            >
+                              <FileText className="h-4 w-4" />
+                              View Invoice
+                            </button>
 
-                      {/* Status Actions */}
-                      {row.status === 'pending' && (
-                        <Button size="sm" variant="outline" onClick={() => updateStatus(row.id, 'confirmed')}>
-                          Confirm
-                        </Button>
-                      )}
+                            {/* Separator */}
+                            <div className="border-t my-1"></div>
 
-                      {row.status === 'confirmed' && (
-                        <Button size="sm" variant="outline" onClick={() => updateStatus(row.id, 'completed')}>
-                          Complete
-                        </Button>
-                      )}
+                            {/* Status Actions */}
+                            {row.status === 'pending' && (
+                              <button
+                                onClick={() => {
+                                  updateStatus(row.id, 'confirmed');
+                                  setOpenDropdown(null);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-green-600"
+                              >
+                                <Check className="h-4 w-4" />
+                                Confirm Booking
+                              </button>
+                            )}
 
-                      {(row.status === 'pending' || row.status === 'confirmed') && (
-                        <Button size="sm" variant="error" onClick={() => updateStatus(row.id, 'cancelled')}>
-                          Cancel
-                        </Button>
-                      )}
+                            {row.status === 'confirmed' && (
+                              <button
+                                onClick={() => {
+                                  updateStatus(row.id, 'completed');
+                                  setOpenDropdown(null);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-blue-600"
+                              >
+                                <Check className="h-4 w-4" />
+                                Mark Complete
+                              </button>
+                            )}
 
-                      {/* Payment Actions */}
-                      {row.payment_status === 'pending' && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={async () => {
-                            try {
-                              await paymentService.confirmPayment(undefined, row.id);
-                              toast.success('Payment confirmed');
-                              load();
-                            } catch (e: any) {
-                              toast.error(e?.response?.data?.message || 'Payment confirm failed');
-                            }
-                          }}
-                        >
-                          Mark Paid
-                        </Button>
+                            {(row.status === 'pending' || row.status === 'confirmed') && (
+                              <button
+                                onClick={() => {
+                                  updateStatus(row.id, 'cancelled');
+                                  setOpenDropdown(null);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600"
+                              >
+                                <X className="h-4 w-4" />
+                                Cancel Booking
+                              </button>
+                            )}
+
+                            {/* Payment Actions */}
+                            {row.payment_status === 'pending' && (
+                              <>
+                                <div className="border-t my-1"></div>
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      await paymentService.confirmPayment(undefined, row.id);
+                                      toast.success('Payment confirmed');
+                                      load();
+                                      setOpenDropdown(null);
+                                    } catch (e: any) {
+                                      toast.error(e?.response?.data?.message || 'Payment confirm failed');
+                                    }
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-green-600"
+                                >
+                                  <DollarSign className="h-4 w-4" />
+                                  Mark as Paid
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
                       )}
                     </div>
                   )
                 },
               ]}
             />
+            </div>
           )}
 
           {/* Pagination */}

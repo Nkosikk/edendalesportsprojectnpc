@@ -106,7 +106,7 @@ const PaymentStatusPage: React.FC = () => {
                 <div className="space-y-3 border-t pt-4">
                   <div className="flex justify-between"><span className="text-gray-600">Payment Reference</span><span className="font-medium">{status.payment.payment_reference}</span></div>
                   <div className="flex justify-between"><span className="text-gray-600">Booking Reference</span><span>{status.payment.booking_reference}</span></div>
-                  <div className="flex justify-between"><span className="text-gray-600">Amount</span><span className="font-semibold">R {status.payment.amount?.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-600">Amount</span><span className="font-semibold">R {Number(status.payment.amount || 0).toFixed(2)}</span></div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Status</span>
                     <span className={`uppercase font-semibold ${
