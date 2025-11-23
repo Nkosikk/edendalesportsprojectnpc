@@ -104,6 +104,7 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
             return true;
           })();
           const disabled = baseUnavailable || !canStartHere;
+          const isBooked = !slot.available && !slot.blocked && withinHours;
           const title = !withinHours 
             ? 'Outside operating hours'
             : !baseUnavailable && !canStartHere
@@ -117,7 +118,10 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
               onClick={() => handleSelect(slot.start)}
               className={`
                 relative rounded-lg border p-3 text-center text-xs font-medium transition
-                ${disabled ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-white hover:bg-primary-50'}
+                ${disabled ? 
+                  isBooked ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                  : 'bg-white hover:bg-primary-50'
+                }
                 ${isSelected ? 'ring-2 ring-primary-600 border-primary-600' : ''}
               `}
             >
@@ -145,7 +149,8 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
         <div className="flex items-center gap-1"><span className="w-3 h-3 bg-primary-600 rounded" /> Selected Start</div>
       </div>
       <div className="text-xs text-gray-500 mt-2">
-        Operating Hours: {date.getDay() === 0 || date.getDay() === 6 ? 'Weekend 09:00-22:00' : 'Weekday 16:00-22:00'}
+        <div>Operating Hours: {date.getDay() === 0 || date.getDay() === 6 ? 'Weekend 09:00-22:00' : 'Weekday 16:00-22:00'}</div>
+        <div className="mt-1">Selected duration: {duration} hour{duration > 1 ? 's' : ''}</div>
       </div>
       <div className="flex justify-end">
         <Button variant="outline" size="sm" onClick={() => refetch()}>Refresh</Button>

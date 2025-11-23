@@ -80,11 +80,56 @@ const FieldsManagementPage: React.FC = () => {
 
   const handleEdit = (field: SportsField) => setEditing(field);
 
+  const validateBlockTime = (startTime: string, endTime: string, date: string): string | null => {
+    // Parse time strings
+    const [startHour, startMin] = startTime.split(':').map(Number);
+    const [endHour, endMin] = endTime.split(':').map(Number);
+    
+    // Validate time format
+    if (isNaN(startHour) || isNaN(startMin) || isNaN(endHour) || isNaN(endMin)) {
+      return 'Invalid time format';
+    }
+    
+    // Check if times are within 24-hour format
+    if (startHour < 0 || startHour > 23 || startMin < 0 || startMin > 59 ||
+        endHour < 0 || endHour > 23 || endMin < 0 || endMin > 59) {
+      return 'Time must be in 24-hour format (00:00-23:59)';
+    }
+    
+    // Check if start time is before end time
+    const startMinutes = startHour * 60 + startMin;
+    const endMinutes = endHour * 60 + endMin;
+    if (startMinutes >= endMinutes) {
+      return 'Start time must be before end time';
+    }
+    
+    // Check operating hours based on date
+    const blockDate = new Date(date);
+    const isWeekend = blockDate.getDay() === 0 || blockDate.getDay() === 6;
+    const operatingStart = isWeekend ? 9 : 16; // Weekend: 09:00, Weekday: 16:00
+    const operatingEnd = 22; // Both: 22:00
+    
+    if (startHour < operatingStart || endHour > operatingEnd) {
+      const hoursText = isWeekend ? '09:00-22:00' : '16:00-22:00';
+      return `Time must be within operating hours: ${hoursText}`;
+    }
+    
+    return null;
+  };
+
   const handleBlock = async () => {
     if (!blockFieldId || !blockDate) {
       toast.error('Field and date required');
       return;
     }
+    
+    // Validate time input
+    const timeError = validateBlockTime(blockStart, blockEnd, blockDate);
+    if (timeError) {
+      toast.error(timeError);
+      return;
+    }
+    
     const payload = {
       field_id: Number(blockFieldId),
       date: blockDate,

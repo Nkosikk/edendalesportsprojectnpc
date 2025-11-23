@@ -37,9 +37,29 @@ const FieldForm = ({ onCreated, onUpdated, editingField, onCancelEdit }: FieldFo
     setForm(prev => ({ ...prev, [key]: value }));
   };
 
+  const validateFieldName = (name: string): string | null => {
+    if (!name.trim()) return 'Field name is required';
+    if (name.length < 2) return 'Field name must be at least 2 characters';
+    if (name.length > 50) return 'Field name must be less than 50 characters';
+    // Allow alphanumeric, spaces, hyphens, dots, apostrophes, and parentheses
+    const validPattern = /^[a-zA-Z0-9\s\-\.\'\(\)]+$/;
+    if (!validPattern.test(name)) {
+      return 'Field name can only contain letters, numbers, spaces, hyphens, dots, apostrophes, and parentheses';
+    }
+    return null;
+  };
+
   const handleSubmit = async () => {
     try {
       setLoading(true);
+      
+      // Validate field name
+      const nameError = validateFieldName(form.name);
+      if (nameError) {
+        toast.error(nameError);
+        return;
+      }
+
       if (editingField) {
         const updated = await fieldService.updateField(editingField.id, form);
         toast.success('Field updated');

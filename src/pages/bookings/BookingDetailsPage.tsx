@@ -1,22 +1,72 @@
-import { useParams, Link } from 'react-router-dom';
-import { useQuery } from 'react-query';
-import { Calendar, Clock, ArrowLeft } from 'lucide-react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useQuery, useQueryClient } from 'react-query';
+import { Calendar, Clock, ArrowLeft, FileText } from 'lucide-react';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
+import InvoiceModal from '../../components/invoices/InvoiceModal';
 import { bookingService } from '../../services/bookingService';
 import type { BookingDetails } from '../../types';
 import { formatCurrency, formatDate, formatTime } from '../../lib/utils';
 import PayButton from '../../components/payments/PayButton';
+import { paymentService } from '../../services/paymentService';
+import { useAuth } from '../../contexts/AuthContext';
+import toast from 'react-hot-toast';
+import { useState } from 'react';
 
 const BookingDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const bookingId = Number(id);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelling, setCancelling] = useState(false);
+  const [markingPaid, setMarkingPaid] = useState(false);
 
   const { data: booking, isLoading, error } = useQuery<BookingDetails>(
     ['booking', bookingId],
     () => bookingService.getBookingById(bookingId),
     { enabled: Number.isFinite(bookingId) }
   );
+
+  const handleCancelBooking = async () => {
+    try {
+      setCancelling(true);
+      await bookingService.cancelBooking(bookingId, cancelReason);
+      toast.success('Booking cancelled successfully');
+      
+      // Invalidate queries to refresh data
+      queryClient.invalidateQueries(['booking', bookingId]);
+      queryClient.invalidateQueries(['bookings']);
+      
+      // Close modal and navigate back
+      setShowCancelModal(false);
+      navigate('/app/bookings');
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to cancel booking');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleMarkAsPaid = async () => {
+    try {
+      setMarkingPaid(true);
+      await paymentService.confirmPayment(undefined, bookingId);
+      toast.success('Payment marked as received');
+      
+      // Refresh booking data
+      queryClient.invalidateQueries(['booking', bookingId]);
+      queryClient.invalidateQueries(['bookings']);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to mark as paid');
+    } finally {
+      setMarkingPaid(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -71,9 +121,31 @@ const BookingDetailsPage = () => {
                 <Calendar className="h-4 w-4 mr-2" />
                 <span>{formatDate(booking.booking_date)}</span>
               </div>
-              <div className="flex items-center text-gray-700">
+              <div className="flex items-center text-gray-700 mb-2">
                 <Clock className="h-4 w-4 mr-2" />
                 <span>{formatTime(booking.start_time)} - {formatTime(booking.end_time)}</span>
+              </div>
+              <div className="text-sm text-gray-500">
+                <div className="mb-1">
+                  <span className="font-medium">Payment Status:</span> 
+                  <span className={`ml-2 px-2 py-1 text-xs rounded ${
+                    booking.payment_status === 'paid' ? 'bg-green-100 text-green-800' :
+                    booking.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-gray-100 text-gray-800'
+                  }`}>
+                    {booking.payment_status?.toUpperCase() || 'UNKNOWN'}
+                  </span>
+                </div>
+                {booking.payment_method && (
+                  <div className="mb-1">
+                    <span className="font-medium">Payment Method:</span> {booking.payment_method?.toUpperCase()}
+                  </div>
+                )}
+                {booking.notes && (
+                  <div className="mb-1">
+                    <span className="font-medium">Notes:</span> {booking.notes}
+                  </div>
+                )}
               </div>
             </div>
             <div>
@@ -82,15 +154,84 @@ const BookingDetailsPage = () => {
             </div>
           </div>
 
-          <div className="mt-6 flex items-center gap-3">
-            {showPay && (
+          <div className="mt-6 flex items-center gap-3 flex-wrap">
+            {showPay && user?.role === 'customer' && (
               <PayButton bookingId={booking.id} label="Pay Now" />
             )}
+            {user?.role === 'admin' && booking.payment_status === 'pending' && (
+              <Button 
+                variant="outline" 
+                onClick={handleMarkAsPaid}
+                loading={markingPaid}
+              >
+                Mark as Paid
+              </Button>
+            )}
+            <Button 
+              variant="outline" 
+              onClick={() => setShowInvoiceModal(true)}
+              icon={FileText}
+            >
+              View Invoice
+            </Button>
             {booking.status === 'pending' && (
-              <Button variant="error">Cancel Booking</Button>
+              <Button 
+                variant="error" 
+                onClick={() => setShowCancelModal(true)}
+              >
+                Cancel Booking
+              </Button>
             )}
           </div>
         </div>
+
+        {/* Cancel Confirmation Modal */}
+        <Modal
+          isOpen={showCancelModal}
+          onClose={() => setShowCancelModal(false)}
+          title="Cancel Booking"
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Are you sure you want to cancel this booking? This action cannot be undone.
+            </p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Reason for cancellation (optional)
+              </label>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                className="input w-full"
+                rows={3}
+                placeholder="Please provide a reason for cancelling..."
+              />
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button
+                variant="outline"
+                onClick={() => setShowCancelModal(false)}
+                disabled={cancelling}
+              >
+                Keep Booking
+              </Button>
+              <Button
+                variant="error"
+                onClick={handleCancelBooking}
+                loading={cancelling}
+              >
+                Cancel Booking
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Invoice Modal */}
+        <InvoiceModal
+          isOpen={showInvoiceModal}
+          onClose={() => setShowInvoiceModal(false)}
+          booking={booking}
+        />
       </div>
     </div>
   );

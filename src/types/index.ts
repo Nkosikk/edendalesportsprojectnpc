@@ -334,6 +334,8 @@ export interface AdminBookingFilters {
   status?: string;
   payment_status?: string;
   user_search?: string;
+  date_from?: string;
+  date_to?: string;
 }
 
 export interface UserFilters {

@@ -46,7 +46,6 @@ const Header = () => {
             />
             <div className="text-center -mt-4">
               <div className="text-lg font-bold text-gray-900">Edendale Sports Projects</div>
-              <div className="text-xs text-gray-600">(ESP)</div>
             </div>
           </Link>
 

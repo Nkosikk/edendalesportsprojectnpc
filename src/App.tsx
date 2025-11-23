@@ -14,10 +14,8 @@ import BookingDetailsPage from './pages/bookings/BookingDetailsPage'
 import ModifyBookingPage from './pages/bookings/ModifyBookingPage'
 import FieldAvailabilityPage from './pages/fields/FieldAvailabilityPage'
 import PaymentStatusPage from './pages/payments/PaymentStatusPage'
-import { 
-  RegisterPage, 
-  NotFoundPage 
-} from './pages/PlaceholderPages'
+import RegisterPage from './pages/auth/RegisterPage'
+import { NotFoundPage } from './pages/PlaceholderPages'
 import ProfilePage from './pages/account/ProfilePage'
 import CreateBookingPage from './pages/bookings/CreateBookingPage'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
@@ -27,6 +25,7 @@ import BookingsManagementPage from './pages/admin/BookingsManagementPage'
 import ReportsRevenuePage from './pages/admin/ReportsRevenuePage'
 import ReportsAnalyticsPage from './pages/admin/ReportsAnalyticsPage'
 import BookingOverviewPage from './pages/admin/BookingOverviewPage'
+import InvoicePage from './pages/invoices/InvoicePage'
 
 function App() {
   const { loading } = useAuth()
@@ -61,6 +60,7 @@ function App() {
         <Route path="payments/return" element={<PaymentStatusPage />} />
         <Route path="payments/cancel" element={<PaymentStatusPage />} />
         <Route path="payments/notify" element={<PaymentStatusPage />} />
+        <Route path="invoices/:id" element={<InvoicePage />} />
       </Route>
 
       {/* Admin Routes */}

@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Clock, Plus, Filter } from 'lucide-react';
+import { Calendar, Clock, Plus, Filter, FileText } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { bookingService } from '../../services/bookingService';
-import { adminService } from '../../services/adminService';
 import type { BookingDetails } from '../../types';
 import { formatDate, formatTime, formatCurrency } from '../../lib/utils';
 import PayButton from '../../components/payments/PayButton';
@@ -22,9 +21,10 @@ const BookingsPage = () => {
 
   const { data: bookings, isLoading, error, refetch } = useQuery<BookingDetails[]>(
     ['bookings', user?.id || 'anon', statusFilter],
-    () => bookingService.getBookings({
-      status: statusFilter === 'all' ? undefined : (statusFilter.toLowerCase() as any),
-    }),
+    () => {
+      const filters = statusFilter === 'all' ? {} : { status: statusFilter.toLowerCase() as any };
+      return bookingService.getBookings(filters);
+    },
     { 
       retry: 1, 
       enabled: !!user,
@@ -100,7 +100,7 @@ const BookingsPage = () => {
       case 'cancelled':
         return 'bg-error-100 text-error-800';
       case 'completed':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-blue-100 text-blue-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -143,17 +143,7 @@ const BookingsPage = () => {
     };
   }, [visibleBookings, refetch, queryClient]);
 
-  const handleMarkAsPaid = async (bookingId: string) => {
-    try {
-      console.log('BookingsPage: Marking booking as paid, ID:', bookingId);
-      await adminService.markBookingAsPaid(String(bookingId)); // Ensure bookingId is a string
-      toast.success('Booking marked as paid successfully!');
-      refetch(); // Refresh the booking list
-    } catch (error) {
-      console.error('BookingsPage: Error marking booking as paid:', error);
-      toast.error('Failed to mark booking as paid. Please try again.');
-    }
-  };
+
 
   if (isLoading) {
     return (
@@ -198,7 +188,7 @@ const BookingsPage = () => {
                     : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
                 }`}
               >
-                {status === 'all' ? 'All' : status}
+                {status === 'all' ? 'All' : status.charAt(0).toUpperCase() + status.slice(1)}
               </button>
             ))}
           </div>
@@ -263,6 +253,11 @@ const BookingsPage = () => {
                     <Clock className="h-4 w-4 mr-2" />
                     {formatTime(booking.start_time)} - {formatTime(booking.end_time)}
                   </div>
+                  {booking.notes && (
+                    <div className="text-sm text-gray-600">
+                      <span className="text-gray-500">📝 Notes:</span> {booking.notes.length > 50 ? booking.notes.substring(0, 50) + '...' : booking.notes}
+                    </div>
+                  )}
                 </div>
 
                 <div className="border-t border-gray-200 pt-4">
@@ -278,6 +273,18 @@ const BookingsPage = () => {
                         View Details
                       </Button>
                     </Link>
+                    {(booking.status === 'pending' || booking.status === 'confirmed') && (
+                      <Link to={`/app/bookings/${booking.id}/edit`} className="flex-1">
+                        <Button variant="outline" size="sm" className="w-full">
+                          Edit
+                        </Button>
+                      </Link>
+                    )}
+                    <Link to={`/app/invoices/${booking.id}`}>
+                      <Button variant="outline" size="sm" title="View Invoice">
+                        <FileText className="h-4 w-4" />
+                      </Button>
+                    </Link>
                     {booking.status === 'pending' && booking.payment_status === 'pending' && (
                       <PayButton bookingId={booking.id} label="Pay" />
                     )}
@@ -289,15 +296,6 @@ const BookingsPage = () => {
                         disabled={cancellingRef.current.has(booking.id)}
                       >
                         {cancellingRef.current.has(booking.id) ? 'Cancelling...' : 'Cancel'}
-                      </Button>
-                    )}
-                    {booking.status === 'pending' && booking.payment_status === 'pending' && (
-                      <Button
-                        variant="success"
-                        size="sm"
-                        onClick={() => handleMarkAsPaid(String(booking.id))} // Convert booking.id to string
-                      >
-                        Mark as Paid
                       </Button>
                     )}
                   </div>
