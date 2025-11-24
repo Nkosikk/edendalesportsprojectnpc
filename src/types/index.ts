@@ -20,6 +20,13 @@ export interface User {
   updated_at?: string;
 }
 
+export interface Announcement {
+  message: string;
+  active: boolean;
+  updated_at?: string;
+  updatedAt?: string;
+}
+
 export interface SportsField {
   id: number;
   name: string;
@@ -273,6 +280,8 @@ export interface CreateBookingRequest {
   start_time: string;
   end_time: string;
   notes?: string;
+  duration_hours?: number;
+  durationHours?: number;
 }
 
 export interface UpdateBookingRequest {
@@ -280,6 +289,8 @@ export interface UpdateBookingRequest {
   start_time?: string;
   end_time?: string;
   notes?: string;
+  duration_hours?: number;
+  durationHours?: number;
 }
 
 export interface CreateFieldRequest {

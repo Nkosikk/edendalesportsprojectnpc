@@ -52,6 +52,7 @@ const CreateBookingPage = () => {
         booking_date: formatLocalYMD(date),
         start_time: normalizeTimeHM(startTime),
         end_time: normalizeTimeHM(endTime),
+        duration_hours: duration,
         notes: notes || undefined,
       });
     },

@@ -6,6 +6,7 @@ import type {
   BookingFilters,
   ApiResponse,
 } from '../types';
+import { toApiTime } from '../utils/scheduling';
 
 const normalizePaymentStatus = (row: any): BookingDetails['payment_status'] => {
   const raw = (row?.payment_status ?? row?.paymentStatus ?? row?.payment?.status ?? row?.payment_status_text ?? row?.status_payment ?? '').toString().toLowerCase();
@@ -84,6 +85,78 @@ const normalizeBookingRecord = (row: any): BookingDetails => {
   return normalized as BookingDetails;
 };
 
+type BookingPayloadSource = Partial<CreateBookingRequest & UpdateBookingRequest> & { field_id?: number };
+
+const parseTimeToHourFraction = (time?: string | null): number | null => {
+  if (!time) return null;
+  const match = String(time).match(/(\d{1,2}):(\d{1,2})/);
+  if (!match) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+  return hour + minute / 60;
+};
+
+const deriveDurationHours = (data: BookingPayloadSource, normalizedStart?: string, normalizedEnd?: string): number | undefined => {
+  const direct = data.duration_hours ?? (data as any).durationHours;
+  if (typeof direct === 'number' && direct > 0) return direct;
+  const start = parseTimeToHourFraction(normalizedStart ?? data.start_time ?? (data as any).startTime);
+  const end = parseTimeToHourFraction(normalizedEnd ?? data.end_time ?? (data as any).endTime);
+  if (start === null || end === null || end <= start) return undefined;
+  const diff = end - start;
+  return Number(diff.toFixed(2));
+};
+
+const buildBookingPayload = (data: BookingPayloadSource, { includeFieldId }: { includeFieldId: boolean }) => {
+  const payload: Record<string, any> = {};
+
+  if (includeFieldId) {
+    const fieldId = Number(data.field_id);
+    if (!Number.isFinite(fieldId)) {
+      throw new Error('Field ID is required for booking creation');
+    }
+    payload.field_id = fieldId;
+    payload.fieldId = fieldId;
+    payload.field = fieldId;
+  }
+
+  if (data.booking_date) {
+    payload.booking_date = data.booking_date;
+    payload.bookingDate = data.booking_date;
+  }
+
+  const rawStart = data.start_time ?? (data as any).startTime;
+  const rawEnd = data.end_time ?? (data as any).endTime;
+  const normalizedStart = rawStart ? toApiTime(rawStart) : undefined;
+  const normalizedEnd = rawEnd ? toApiTime(rawEnd) : undefined;
+
+  if (normalizedStart) {
+    payload.start_time = normalizedStart;
+    payload.startTime = normalizedStart;
+  }
+  if (normalizedEnd) {
+    payload.end_time = normalizedEnd;
+    payload.endTime = normalizedEnd;
+  }
+
+  if (includeFieldId) {
+    if (!payload.booking_date) throw new Error('Booking date is required for booking creation');
+    if (!normalizedStart || !normalizedEnd) throw new Error('Start and end times are required for booking creation');
+  }
+
+  const duration = deriveDurationHours(data, normalizedStart, normalizedEnd);
+  if (typeof duration === 'number' && duration > 0) {
+    payload.duration_hours = duration;
+    payload.durationHours = duration;
+  }
+
+  if (data.notes !== undefined) {
+    payload.notes = data.notes;
+  }
+
+  return payload;
+};
+
 /**
  * Booking Service
  * Handles all booking-related operations
@@ -126,7 +199,8 @@ export const bookingService = {
    * Create a new booking
    */
   createBooking: async (data: CreateBookingRequest): Promise<BookingDetails> => {
-    const response = await apiClient.post<ApiResponse<BookingDetails>>('/bookings', data);
+    const payload = buildBookingPayload(data, { includeFieldId: true });
+    const response = await apiClient.post<ApiResponse<BookingDetails>>('/bookings', payload);
     const result = handleApiResponse<BookingDetails>(response);
     (async () => {
       const { logAudit } = await import('../lib/audit');
@@ -139,7 +213,8 @@ export const bookingService = {
    * Update an existing booking
    */
   updateBooking: async (id: number, data: UpdateBookingRequest): Promise<BookingDetails> => {
-    const response = await apiClient.put<ApiResponse<BookingDetails>>(`/bookings/${id}`, data);
+    const payload = buildBookingPayload(data, { includeFieldId: false });
+    const response = await apiClient.put<ApiResponse<BookingDetails>>(`/bookings/${id}`, payload);
     const result = handleApiResponse<BookingDetails>(response);
     (async () => {
       const { logAudit } = await import('../lib/audit');

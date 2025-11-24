@@ -13,12 +13,18 @@ import { Modal } from '../../components/ui/Modal';
 import toast from 'react-hot-toast';
 import { FileText, MoreVertical, Eye, Edit, Check, X, DollarSign } from 'lucide-react';
 
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+
 const BookingsManagementPage: React.FC = () => {
   const [bookings, setBookings] = useState<BookingDetails[]>([]);
   const [filters, setFilters] = useState<AdminBookingFilters>({});
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(20);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(() => {
+    if (typeof window === 'undefined') return 20;
+    const stored = Number(localStorage.getItem('admin_bookings_page_size'));
+    return PAGE_SIZE_OPTIONS.includes(stored) ? stored : 20;
+  });
   const [selectedBookingForInvoice, setSelectedBookingForInvoice] = useState<BookingDetails | null>(null);
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [processingPayment, setProcessingPayment] = useState<number | null>(null);
@@ -78,6 +84,12 @@ const BookingsManagementPage: React.FC = () => {
     return anySuccess;
   };
 
+  const toDateOnly = (value?: string) => {
+    if (!value) return null;
+    const date = new Date(`${value}T00:00:00`);
+    return Number.isNaN(date.getTime()) ? null : date;
+  };
+
   const load = async () => {
     console.log('BookingsManagementPage: Loading bookings with filters:', filters);
     try {
@@ -87,7 +99,28 @@ const BookingsManagementPage: React.FC = () => {
         Object.entries(filters).filter(([_, value]) => value !== undefined && value !== '')
       );
       console.log('BookingsManagementPage: Clean filters:', cleanFilters);
-      const bookings = await adminService.getAllBookings(Object.keys(cleanFilters).length > 0 ? cleanFilters : undefined);
+      const backendFilters: Record<string, any> = { ...cleanFilters };
+      const searchTerm = (cleanFilters.user_search as string | undefined)?.trim();
+      if (searchTerm) {
+        backendFilters.user_search = searchTerm;
+        backendFilters.search = searchTerm;
+        backendFilters.field_name = searchTerm;
+        backendFilters.field = searchTerm;
+        backendFilters.reference = searchTerm;
+        backendFilters.booking_reference = searchTerm;
+      }
+      if (cleanFilters.date_from) {
+        backendFilters.from_date = cleanFilters.date_from;
+        backendFilters.start_date = cleanFilters.date_from;
+      }
+      if (cleanFilters.date_to) {
+        backendFilters.to_date = cleanFilters.date_to;
+        backendFilters.end_date = cleanFilters.date_to;
+      }
+
+      const bookings = await adminService.getAllBookings(
+        Object.keys(backendFilters).length > 0 ? (backendFilters as AdminBookingFilters) : undefined
+      );
       console.log('BookingsManagementPage: Received bookings:', bookings);
       // Sort: pending first, then by newest first (created_at then id)
       const sorted = [...bookings].sort((a, b) => {
@@ -100,8 +133,35 @@ const BookingsManagementPage: React.FC = () => {
         if (!isNaN(ta) && !isNaN(tb) && ta !== tb) return tb - ta;
         return b.id - a.id;
       });
-      setBookings(sorted);
-      if (!bookings || bookings.length === 0) {
+      const fromDate = toDateOnly(cleanFilters.date_from as string | undefined);
+      const toDate = toDateOnly(cleanFilters.date_to as string | undefined);
+      const withinRange = sorted.filter((booking) => {
+        if (!fromDate && !toDate) return true;
+        const bookingDate = toDateOnly(booking.booking_date);
+        if (!bookingDate) return true;
+        if (fromDate && bookingDate < fromDate) return false;
+        if (toDate && bookingDate > toDate) return false;
+        return true;
+      });
+
+      const searchFiltered = searchTerm
+        ? withinRange.filter((booking) => {
+            const haystack = [
+              booking.first_name,
+              booking.last_name,
+              booking.email,
+              booking.booking_reference,
+              booking.field_name,
+            ]
+              .filter(Boolean)
+              .join(' ')
+              .toLowerCase();
+            return haystack.includes(searchTerm.toLowerCase());
+          })
+        : withinRange;
+
+      setBookings(searchFiltered);
+      if ((!bookings || bookings.length === 0) && Object.keys(cleanFilters).length === 0) {
         toast.error('No bookings found. Check if you have admin permissions or if bookings exist in the system.');
       }
       // Attempt auto-complete for any bookings whose end time has passed
@@ -123,6 +183,13 @@ const BookingsManagementPage: React.FC = () => {
     load(); 
     setCurrentPage(1); // Reset to first page when filters change
   }, [filters]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('admin_bookings_page_size', String(itemsPerPage));
+    }
+    setCurrentPage(1);
+  }, [itemsPerPage]);
 
   useEffect(() => {
     const fetchFields = async () => {
@@ -285,10 +352,12 @@ const BookingsManagementPage: React.FC = () => {
 
   // Pagination calculations
   const totalItems = bookings.length;
-  const totalPages = Math.ceil(totalItems / itemsPerPage);
+  const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage) || 1);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedBookings = bookings.slice(startIndex, endIndex);
+  const displayStart = totalItems === 0 ? 0 : startIndex + 1;
+  const displayEnd = totalItems === 0 ? 0 : Math.min(endIndex, totalItems);
 
   const goToPage = (page: number) => {
     setCurrentPage(Math.min(Math.max(1, page), totalPages));
@@ -495,12 +564,12 @@ const BookingsManagementPage: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">User/Field</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">User / Email</label>
               <input
                 type="text"
                 value={filters.user_search || ''}
-                onChange={(e) => setFilters({ ...filters, user_search: e.target.value || undefined })}
-                placeholder="Name, email, ref"
+                onChange={(e) => setFilters({ ...filters, user_search: e.target.value?.trim() ? e.target.value : undefined })}
+                placeholder="Name or email"
                 className="px-3 py-2 border rounded-lg w-full text-sm"
               />
             </div>
@@ -734,6 +803,16 @@ const BookingsManagementPage: React.FC = () => {
                                 <div className="border-t my-1"></div>
                                 <button
                                   onClick={async () => {
+                                    const confirmLabel = row.payment_status === 'manual_pending'
+                                      ? 'Confirm manual payment'
+                                      : 'Mark this booking as paid';
+                                    const confirmation = window.confirm(
+                                      `${confirmLabel} for ${row.booking_reference}? This action cannot be undone.`
+                                    );
+                                    if (!confirmation) {
+                                      setOpenDropdown(null);
+                                      return;
+                                    }
                                     // Prevent duplicate clicks
                                     if (processingPayment === row.id) return;
                                     
@@ -872,11 +951,25 @@ const BookingsManagementPage: React.FC = () => {
           )}
 
           {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="mt-4 flex items-center justify-between">
-              <div className="text-sm text-gray-600">
-                Showing {startIndex + 1}-{Math.min(endIndex, totalItems)} of {totalItems} bookings
-              </div>
+          <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="text-sm text-gray-600">
+              Showing {displayStart}-{displayEnd} of {totalItems} bookings
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
+              <label className="flex items-center gap-2 text-sm text-gray-600">
+                Rows per page:
+                <select
+                  value={itemsPerPage}
+                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                  className="border rounded px-2 py-1 text-sm"
+                >
+                  {PAGE_SIZE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <div className="flex items-center space-x-2">
                 <Button
                   variant="outline"
@@ -908,13 +1001,13 @@ const BookingsManagementPage: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={() => goToPage(currentPage + 1)}
-                  disabled={currentPage === totalPages}
+                  disabled={currentPage === totalPages || totalItems === 0}
                 >
                   Next
                 </Button>
               </div>
             </div>
-          )}
+          </div>
         </CardContent>
       </Card>
 

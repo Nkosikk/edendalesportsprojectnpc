@@ -76,6 +76,7 @@ const ModifyBookingPage = () => {
         booking_date: date.toISOString().split('T')[0],
         start_time: startTime,
         end_time: endTime,
+        duration_hours: duration,
         notes: notes || undefined,
       });
     },

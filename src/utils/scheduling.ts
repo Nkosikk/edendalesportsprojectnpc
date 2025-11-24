@@ -26,20 +26,32 @@ const sanitizeNumber = (value: string | number | undefined, fallback = 0) => {
   return num;
 };
 
+const extractTimeParts = (value: string | null | undefined): [number, number, number] => {
+  if (!value) return [0, 0, 0];
+  // Supports "HH:mm", "HH:mm:ss" as well as full timestamps like "2025-11-24 18:00:00"
+  const match = String(value).match(/(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?/);
+  if (match) {
+    const [, h, m, s] = match;
+    return [sanitizeNumber(h, 0), sanitizeNumber(m, 0), sanitizeNumber(s, 0)];
+  }
+  const parts = String(value).split(':');
+  return [sanitizeNumber(parts[0], 0), sanitizeNumber(parts[1], 0), sanitizeNumber(parts[2], 0)];
+};
+
 export const normalizeTimeHM = (time: string | null | undefined): string => {
   if (!time) return '';
-  const parts = time.split(':');
-  const hour = Math.min(23, Math.max(0, sanitizeNumber(parts[0], 0)));
-  const minute = Math.min(59, Math.max(0, sanitizeNumber(parts[1], 0)));
+  const [rawHour, rawMinute] = extractTimeParts(time);
+  const hour = Math.min(23, Math.max(0, rawHour));
+  const minute = Math.min(59, Math.max(0, rawMinute));
   return `${pad(hour)}:${pad(minute)}`;
 };
 
 export const toApiTime = (time: string | null | undefined): string => {
   if (!time) return '';
-  const parts = time.split(':');
-  const hour = Math.min(23, Math.max(0, sanitizeNumber(parts[0], 0)));
-  const minute = Math.min(59, Math.max(0, sanitizeNumber(parts[1], 0)));
-  const second = Math.min(59, Math.max(0, sanitizeNumber(parts[2], 0)));
+  const [rawHour, rawMinute, rawSecond] = extractTimeParts(time);
+  const hour = Math.min(23, Math.max(0, rawHour));
+  const minute = Math.min(59, Math.max(0, rawMinute));
+  const second = Math.min(59, Math.max(0, rawSecond));
   return `${pad(hour)}:${pad(minute)}:${pad(second)}`;
 };
 

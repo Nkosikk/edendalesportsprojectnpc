@@ -7,6 +7,7 @@ import {
   getRefundAdjustedAmount,
   getExplicitRefundAmount,
 } from '../../lib/utils';
+import { invoiceService } from '../../services/invoiceService';
 
 interface InvoiceData extends BookingDetails {
   invoiceNumber: string;
@@ -52,6 +53,7 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
   const lineAmount = getRefundAdjustedAmount(booking);
   const displayAmount = Math.abs(lineAmount);
   const refundDue = getExplicitRefundAmount(booking);
+  const invoiceTotals = invoiceService.calculateInvoiceTotals(displayAmount, 0);
 
   return (
     <div className="max-w-4xl mx-auto bg-white p-8 shadow-lg" id="invoice-content">
@@ -151,15 +153,15 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
         <div className="w-64">
           <div className="flex justify-between py-2 border-b border-gray-300">
             <span className="font-medium">Subtotal:</span>
-            <span>{formatCurrency(displayAmount)}</span>
+            <span>{formatCurrency(invoiceTotals.subtotal)}</span>
           </div>
           <div className="flex justify-between py-2 border-b border-gray-300">
             <span className="font-medium">VAT (0%):</span>
-            <span>{formatCurrency(0)}</span>
+            <span>{formatCurrency(invoiceTotals.vat)}</span>
           </div>
           <div className="flex justify-between py-3 text-lg font-bold border-b-2 border-gray-900">
             <span>Total:</span>
-            <span>{formatCurrency(displayAmount * 1.15)}</span>
+            <span>{formatCurrency(invoiceTotals.total)}</span>
           </div>
           {lineAmount < 0 && (
             <p className="text-xs text-red-600 font-semibold mt-2">

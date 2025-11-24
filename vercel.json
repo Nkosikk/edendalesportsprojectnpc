@@ -4,9 +4,37 @@
   "devCommand": "npm run dev",
   "installCommand": "npm install",
   "rewrites": [
-    { "source": "/app/(.*)", "destination": "/" },
-    { "source": "/admin/(.*)", "destination": "/" },
-    { "source": "/login", "destination": "/" },
-    { "source": "/register", "destination": "/" }
+    {
+      "source": "/admin",
+      "destination": "/"
+    },
+    {
+      "source": "/app",
+      "destination": "/"
+    },
+    {
+      "source": "/login",
+      "destination": "/"
+    },
+    {
+      "source": "/register",
+      "destination": "/"
+    }
   ]
+      {
+        "source": "/app",
+        "destination": "/"
+      },
+      {
+        "source": "/admin",
+        "destination": "/"
+      },
+      {
+        "source": "/app/(.*)",
+        "destination": "/"
+      },
+      {
+        "source": "/admin/(.*)",
+        "destination": "/"
+      },
 }
