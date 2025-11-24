@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from 'react-query'
 import { Toaster } from 'react-hot-toast'
 import App from './App.tsx'
 import { AuthProvider } from './contexts/AuthContext.tsx'
+import { AnnouncementProvider } from './contexts/AnnouncementContext'
 import './index.css'
 import ErrorBoundary from './components/ui/ErrorBoundary'
 
@@ -28,8 +29,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           }}
         >
           <AuthProvider>
-            <App />
-            <Toaster 
+            <AnnouncementProvider>
+              <App />
+              <Toaster 
             position="top-right"
             toastOptions={{
               duration: 3000,
@@ -67,6 +69,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
               top: 80,
             }}
           />
+            </AnnouncementProvider>
           </AuthProvider>
         </BrowserRouter>
       </QueryClientProvider>

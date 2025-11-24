@@ -26,6 +26,7 @@ import ReportsRevenuePage from './pages/admin/ReportsRevenuePage'
 import ReportsAnalyticsPage from './pages/admin/ReportsAnalyticsPage'
 import BookingOverviewPage from './pages/admin/BookingOverviewPage'
 import InvoicePage from './pages/invoices/InvoicePage'
+import CommunicationPage from './pages/admin/CommunicationPage'
 
 function App() {
   const { loading } = useAuth()
@@ -72,6 +73,7 @@ function App() {
         <Route path="reports/revenue" element={<ReportsRevenuePage />} />
         <Route path="reports/analytics" element={<ReportsAnalyticsPage />} />
         <Route path="overview" element={<BookingOverviewPage />} />
+        <Route path="communication" element={<CommunicationPage />} />
       </Route>
 
       {/* 404 Route */}

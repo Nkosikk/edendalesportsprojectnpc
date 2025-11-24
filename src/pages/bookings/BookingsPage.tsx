@@ -7,7 +7,15 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { bookingService } from '../../services/bookingService';
 // paymentService unused; removed import to satisfy TS
 import type { BookingDetails } from '../../types';
-import { formatDate, formatTime, formatCurrency } from '../../lib/utils';
+import {
+  formatDate,
+  formatTime,
+  formatCurrency,
+  getRefundAdjustedAmount,
+  canUserCancelBooking,
+  getCancellationRestrictionMessage,
+  getExplicitRefundAmount,
+} from '../../lib/utils';
 import PayButton from '../../components/payments/PayButton';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -86,13 +94,22 @@ const BookingsPage = () => {
 
   const [showPaymentInstructions, setShowPaymentInstructions] = useState<number | null>(null);
 
-  const handleCancelBooking = (bookingId: number) => {
+  const handleCancelBooking = (booking: BookingDetails) => {
     // Prevent duplicate cancellations (handles React StrictMode double execution)
-    if (cancellingRef.current.has(bookingId)) return;
-    
+    if (cancellingRef.current.has(booking.id)) return;
+    const canCancel = canUserCancelBooking(booking, user?.role);
+    if (!canCancel) {
+      const message = getCancellationRestrictionMessage(booking, user?.role) || 'This booking can no longer be cancelled online.';
+      toast.error(message);
+      return;
+    }
+
     if (window.confirm('Are you sure you want to cancel this booking?')) {
-      cancellingRef.current.add(bookingId);
-      cancelMutation.mutate({ bookingId, reason: 'Cancelled by user' });
+      cancellingRef.current.add(booking.id);
+      cancelMutation.mutate({
+        bookingId: booking.id,
+        reason: user?.role === 'admin' ? 'Cancelled by admin' : 'Cancelled by user',
+      });
     }
   };
 
@@ -166,7 +183,7 @@ const BookingsPage = () => {
         {/* Header */}
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">My Bookings</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Bookings</h1>
             <p className="mt-2 text-gray-600">Manage your sports field reservations</p>
           </div>
           <div className="mt-4 sm:mt-0">
@@ -223,8 +240,14 @@ const BookingsPage = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {(visibleBookings || []).map((booking) => (
-              <div key={booking.id} className="card hover:shadow-lg transition-shadow">
+            {(visibleBookings || []).map((booking) => {
+              const adjustedAmount = getRefundAdjustedAmount(booking);
+              const refundDue = getExplicitRefundAmount(booking);
+              const showCancelAction = (booking.status === 'pending' || booking.status === 'confirmed') && booking.status !== 'cancelled';
+              const canCancel = canUserCancelBooking(booking, user?.role);
+              const cancelRestriction = getCancellationRestrictionMessage(booking, user?.role);
+              return (
+                <div key={booking.id} className="card hover:shadow-lg transition-shadow">
                 <div className="flex items-start justify-between mb-4">
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-1">
@@ -235,9 +258,9 @@ const BookingsPage = () => {
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(booking.status)}`}>
                       {booking.status.toUpperCase()}
                     </span>
-                    {booking.status === 'cancelled' ? (
-                      <span className="px-2 py-1 text-[10px] font-semibold rounded-full bg-red-100 text-red-700">
-                        CANCELLED
+                    {booking.payment_status === 'refunded' ? (
+                      <span className="px-2 py-1 text-[10px] font-semibold rounded-full bg-purple-100 text-purple-700">
+                        REFUNDED
                       </span>
                     ) : booking.payment_status === 'paid' ? (
                       <span className="px-2 py-1 text-[10px] font-semibold rounded-full bg-green-100 text-green-700">
@@ -275,9 +298,14 @@ const BookingsPage = () => {
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm text-gray-500">Total Amount</span>
                     <span className="text-lg font-semibold text-gray-900">
-                      {formatCurrency(booking.total_amount)}
+                      {formatCurrency(Math.abs(adjustedAmount))}
                     </span>
                   </div>
+                  {booking.payment_status === 'refunded' ? (
+                    <p className="text-xs font-semibold text-purple-600">Refund processed{refundDue ? ` (${formatCurrency(refundDue)})` : ''}</p>
+                  ) : adjustedAmount < 0 ? (
+                    <p className="text-xs font-semibold text-red-600">Refund owed to you{refundDue ? `: ${formatCurrency(refundDue)}` : ''}</p>
+                  ) : null}
                   <div className="flex flex-wrap gap-2">
                     <Link to={`/app/bookings/${booking.id}`} className="flex-1 min-w-[100px]">
                       <Button variant="outline" size="sm" className="w-full">
@@ -314,20 +342,26 @@ const BookingsPage = () => {
                         Awaiting proof of payment
                       </span>
                     )}
-                    {booking.status === 'pending' && (
-                      <Button
-                        status="cancelled"
-                        size="sm"
-                        onClick={() => handleCancelBooking(booking.id)}
-                        disabled={cancellingRef.current.has(booking.id)}
-                      >
-                        {cancellingRef.current.has(booking.id) ? 'Cancelling...' : 'Cancel'}
-                      </Button>
+                    {showCancelAction && (
+                      <div className="flex-1 min-w-[120px]" title={!canCancel && cancelRestriction ? cancelRestriction : undefined}>
+                        <Button
+                          status="cancelled"
+                          size="sm"
+                          onClick={() => handleCancelBooking(booking)}
+                          disabled={cancellingRef.current.has(booking.id) || !canCancel}
+                        >
+                          {cancellingRef.current.has(booking.id) ? 'Cancelling...' : 'Cancel'}
+                        </Button>
+                      </div>
                     )}
                   </div>
+                  {showCancelAction && !canCancel && cancelRestriction && (
+                    <p className="text-[11px] text-gray-500 mt-2">{cancelRestriction}</p>
+                  )}
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
 

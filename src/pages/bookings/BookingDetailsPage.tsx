@@ -7,7 +7,15 @@ import { Modal } from '../../components/ui/Modal';
 import InvoiceModal from '../../components/invoices/InvoiceModal';
 import { bookingService } from '../../services/bookingService';
 import type { BookingDetails } from '../../types';
-import { formatCurrency, formatDate, formatTime } from '../../lib/utils';
+import {
+  formatCurrency,
+  formatDate,
+  formatTime,
+  getRefundAdjustedAmount,
+  canUserCancelBooking,
+  getCancellationRestrictionMessage,
+  getExplicitRefundAmount,
+} from '../../lib/utils';
 import PayButton from '../../components/payments/PayButton';
 import { paymentService } from '../../services/paymentService';
 import { useAuth } from '../../contexts/AuthContext';
@@ -36,9 +44,15 @@ const BookingDetailsPage = () => {
   );
 
   const handleCancelBooking = async () => {
+    if (!booking) return;
+    if (!canUserCancelBooking(booking, user?.role)) {
+      const message = getCancellationRestrictionMessage(booking, user?.role) || 'This booking can no longer be cancelled online.';
+      toast.error(message);
+      return;
+    }
     try {
       setCancelling(true);
-      await bookingService.cancelBooking(bookingId, cancelReason);
+      await bookingService.cancelBooking(bookingId, cancelReason || (user?.role === 'admin' ? 'Cancelled by admin' : 'Cancelled by user'));
       toast.success('Booking cancelled successfully');
       
       // Invalidate queries to refresh data
@@ -116,6 +130,11 @@ const BookingDetailsPage = () => {
   }
 
   const showPay = booking.status === 'pending';
+  const adjustedAmount = getRefundAdjustedAmount(booking);
+  const refundDue = getExplicitRefundAmount(booking);
+  const showCancelAction = booking.status === 'pending' || booking.status === 'confirmed';
+  const canCancel = canUserCancelBooking(booking, user?.role);
+  const cancelRestriction = getCancellationRestrictionMessage(booking, user?.role);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -153,10 +172,11 @@ const BookingDetailsPage = () => {
               </div>
               <div className="text-sm text-gray-500">
                 <div className="mb-1">
-                  <span className="font-medium">Payment Status:</span> 
+                  <span className="font-medium">Payment Status:</span>
                   <span className={`ml-2 px-2 py-1 text-xs rounded ${
                     booking.payment_status === 'paid' ? 'bg-green-100 text-green-800' :
                     booking.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                    booking.payment_status === 'refunded' ? 'bg-purple-100 text-purple-800' :
                     'bg-gray-100 text-gray-800'
                   }`}>
                     {booking.payment_status?.toUpperCase() || 'UNKNOWN'}
@@ -176,7 +196,16 @@ const BookingDetailsPage = () => {
             </div>
             <div>
               <div className="text-sm text-gray-500">Total Amount</div>
-              <div className="text-2xl font-semibold text-gray-900">{formatCurrency(booking.total_amount)}</div>
+              <div className="text-2xl font-semibold text-gray-900">{formatCurrency(Math.abs(adjustedAmount))}</div>
+                {booking.payment_status === 'refunded' ? (
+                  <p className="text-sm font-semibold text-purple-600">
+                    Refund processed {refundDue ? `(${formatCurrency(refundDue)})` : ''}
+                  </p>
+                ) : adjustedAmount < 0 ? (
+                  <p className="text-sm font-semibold text-red-600">
+                    Refund owed {refundDue ? `(${formatCurrency(refundDue)})` : ''}
+                  </p>
+                ) : null}
             </div>
           </div>
 
@@ -201,16 +230,26 @@ const BookingDetailsPage = () => {
             >
               View Invoice
             </Button>
-            {booking.status === 'pending' && (
+            {showCancelAction && (
               <Button 
                 status="cancelled" 
-                onClick={() => setShowCancelModal(true)}
+                onClick={() => {
+                  if (!canCancel) {
+                    if (cancelRestriction) toast.error(cancelRestriction);
+                    return;
+                  }
+                  setShowCancelModal(true);
+                }}
                 size="sm"
+                disabled={!canCancel}
               >
                 Cancel Booking
               </Button>
             )}
           </div>
+          {showCancelAction && !canCancel && cancelRestriction && (
+            <p className="text-xs text-gray-500 mt-2">{cancelRestriction}</p>
+          )}
         </div>
 
         {/* Cancel Confirmation Modal */}
@@ -247,6 +286,7 @@ const BookingDetailsPage = () => {
                 variant="error"
                 onClick={handleCancelBooking}
                 loading={cancelling}
+                disabled={!canCancel}
               >
                 Cancel Booking
               </Button>

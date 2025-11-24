@@ -42,12 +42,7 @@ const InvoicePage: React.FC = () => {
     }
 
     try {
-      await invoiceService.emailInvoice({
-        booking_id: booking.id,
-        recipient_email: booking.email,
-        include_payment_link: booking.payment_status !== 'paid'
-      });
-      toast.success('Invoice sent successfully');
+      toast('Invoice emailing is coming soon.');
     } catch (error: any) {
       toast.error(error.message || 'Failed to send invoice');
     }

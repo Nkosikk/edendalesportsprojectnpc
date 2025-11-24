@@ -7,6 +7,83 @@ import type {
   ApiResponse,
 } from '../types';
 
+const normalizePaymentStatus = (row: any): BookingDetails['payment_status'] => {
+  const raw = (row?.payment_status ?? row?.paymentStatus ?? row?.payment?.status ?? row?.payment_status_text ?? row?.status_payment ?? '').toString().toLowerCase();
+  const isPaidFlag = row?.is_paid === true || row?.is_paid === 1 || row?.is_paid === '1' || !!row?.paid_at || !!row?.payment_confirmed_at;
+  if (isPaidFlag) return 'paid';
+  if (raw.includes('paid') || raw.includes('success') || raw.includes('completed') || raw === '1') return 'paid';
+  if (raw.includes('manual')) return 'manual_pending';
+  if (raw.includes('refund')) return 'refunded';
+  if (raw.includes('fail')) return 'failed';
+  if (raw.includes('pending')) return 'pending';
+  return 'pending';
+};
+
+const normalizeBookingStatus = (row: any): BookingDetails['status'] => {
+  const raw = (row?.status ?? row?.booking_status ?? row?.bookingStatus ?? row?.status_text ?? '').toString().toLowerCase();
+  if (raw.startsWith('cancel')) return 'cancelled';
+  if (raw.startsWith('confirm')) return 'confirmed';
+  if (raw.startsWith('complete') || raw === 'done' || raw === 'finalized' || raw === 'finished') return 'completed';
+  if (raw) return (['pending', 'confirmed', 'cancelled', 'completed'].includes(raw) ? raw : 'pending') as BookingDetails['status'];
+  return 'pending';
+};
+
+const pickNumber = (...values: any[]): number | undefined => {
+  for (const value of values) {
+    const num = Number(value);
+    if (!Number.isNaN(num)) return num;
+  }
+  return undefined;
+};
+
+const pickString = (...values: any[]): string | undefined => {
+  for (const value of values) {
+    if (value === null || value === undefined) continue;
+    const str = String(value).trim();
+    if (str) return str;
+  }
+  return undefined;
+};
+
+const normalizeBookingRecord = (row: any): BookingDetails => {
+  const normalized: any = { ...row };
+  normalized.payment_status = normalizePaymentStatus(row);
+  normalized.status = normalizeBookingStatus(row);
+  const id = pickNumber(row.id, row.booking_id, row.bookingId) ?? 0;
+  normalized.id = Number(id);
+  const bookingRef = pickString(row.booking_reference, row.reference, row.booking_ref, row.ref) ?? '';
+  normalized.booking_reference = bookingRef;
+  const totalAmount = pickNumber(row.total_amount, row.amount, row.total, row.price) ?? 0;
+  normalized.total_amount = Number(totalAmount);
+  const createdAt = pickString(row.created_at, row.booking_created_at, row.createdAt, row.created) ?? new Date().toISOString();
+  normalized.created_at = createdAt;
+  const updatedAt = pickString(row.updated_at, row.booking_updated_at, row.updatedAt, row.updated, createdAt);
+  normalized.updated_at = updatedAt;
+  const refundAmount = pickNumber(
+    row.refund_amount,
+    row.refundAmount,
+    row.refund,
+    row.amount_refund,
+    row.amountRefund,
+    row.refund_due,
+    row.refundDue,
+    row.amount_due_customer,
+    row.amount_due_to_customer,
+  );
+  if (refundAmount !== undefined) normalized.refund_amount = refundAmount;
+  const cancelReason = pickString(
+    row.cancellation_reason,
+    row.cancel_reason,
+    row.cancelReason,
+    row.status_reason,
+    row.reason,
+  );
+  if (cancelReason) normalized.cancellation_reason = cancelReason;
+  const cancelledAt = pickString(row.cancelled_at, row.canceled_at, row.cancelledAt, row.canceledAt);
+  if (cancelledAt) normalized.cancelled_at = cancelledAt;
+  return normalized as BookingDetails;
+};
+
 /**
  * Booking Service
  * Handles all booking-related operations
@@ -21,36 +98,19 @@ export const bookingService = {
       params: filters,
     });
     const payload = handleApiResponse<any>(response);
-    const normalizePaymentStatus = (row: any): BookingDetails['payment_status'] => {
-      const raw = (row?.payment_status ?? row?.paymentStatus ?? row?.payment?.status ?? row?.payment_status_text ?? row?.status_payment ?? '').toString().toLowerCase();
-      const isPaidFlag = row?.is_paid === true || row?.is_paid === 1 || row?.is_paid === '1' || !!row?.paid_at || !!row?.payment_confirmed_at;
-      if (isPaidFlag) return 'paid';
-      if (raw.includes('paid') || raw.includes('success') || raw.includes('completed') || raw === '1') return 'paid';
-      if (raw.includes('manual')) return 'manual_pending';
-      if (raw.includes('refund')) return 'refunded';
-      if (raw.includes('fail')) return 'failed';
-      return 'pending';
-    };
-    const normalizeBookingStatus = (row: any): BookingDetails['status'] => {
-      const raw = (row?.status ?? row?.booking_status ?? row?.bookingStatus ?? row?.status_text ?? '').toString().toLowerCase();
-      if (raw.startsWith('cancel')) return 'cancelled';
-      if (raw.startsWith('confirm')) return 'confirmed';
-      if (raw.startsWith('complete') || raw === 'done' || raw === 'finalized' || raw === 'finished') return 'completed';
-      if (raw) return (['pending','confirmed','cancelled','completed'].includes(raw) ? raw : 'pending') as BookingDetails['status'];
-      return 'pending';
-    };
 
-    const list: any[] = Array.isArray(payload) ? payload : Array.isArray(payload?.data) ? payload.data : Array.isArray(payload?.items) ? payload.items : Array.isArray(payload?.results) ? payload.results : Array.isArray(payload?.records) ? payload.records : [];
-    return list.map((b) => ({
-      ...b,
-      payment_status: normalizePaymentStatus(b),
-      status: normalizeBookingStatus(b),
-      id: Number(b.id ?? b.booking_id ?? b.bookingId),
-      booking_reference: String(b.booking_reference ?? b.reference ?? b.booking_ref ?? b.ref ?? ''),
-      total_amount: Number(b.total_amount ?? b.amount ?? b.total ?? b.price ?? 0),
-      created_at: String(b.created_at ?? b.booking_created_at ?? b.createdAt ?? b.created ?? new Date().toISOString()),
-      updated_at: String(b.updated_at ?? b.booking_updated_at ?? b.updatedAt ?? b.updated ?? (b.created_at ?? new Date().toISOString())),
-    })) as BookingDetails[];
+    const list: any[] = Array.isArray(payload)
+      ? payload
+      : Array.isArray(payload?.data)
+      ? payload.data
+      : Array.isArray(payload?.items)
+      ? payload.items
+      : Array.isArray(payload?.results)
+      ? payload.results
+      : Array.isArray(payload?.records)
+      ? payload.records
+      : [];
+    return list.map(normalizeBookingRecord) as BookingDetails[];
   },
 
   /**
@@ -58,7 +118,8 @@ export const bookingService = {
    */
   getBookingById: async (id: number): Promise<BookingDetails> => {
     const response = await apiClient.get<ApiResponse<BookingDetails>>(`/bookings/${id}`);
-    return handleApiResponse<BookingDetails>(response);
+    const payload = handleApiResponse<BookingDetails | any>(response);
+    return normalizeBookingRecord(payload);
   },
 
   /**

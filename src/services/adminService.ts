@@ -215,6 +215,12 @@ export const adminService = {
     normalized.status = normalizeBookingStatus(booking);
     normalized.created_at = String(booking.created_at ?? booking.booking_created_at ?? booking.createdAt ?? booking.created ?? new Date().toISOString());
     normalized.updated_at = String(booking.updated_at ?? booking.booking_updated_at ?? booking.updatedAt ?? booking.updated ?? normalized.created_at);
+    const refundAmount = Number(booking.refund_amount ?? booking.refundAmount ?? booking.refund ?? booking.amount_refund ?? booking.amountRefund ?? booking.refund_due ?? booking.refundDue ?? booking.amount_due_customer ?? booking.amount_due_to_customer);
+    if (!Number.isNaN(refundAmount)) normalized.refund_amount = refundAmount;
+    const cancelReason = booking.cancellation_reason ?? booking.cancel_reason ?? booking.cancelReason ?? booking.status_reason ?? booking.reason;
+    if (cancelReason) normalized.cancellation_reason = String(cancelReason);
+    const cancelledAt = booking.cancelled_at ?? booking.canceled_at ?? booking.cancelledAt ?? booking.canceledAt;
+    if (cancelledAt) normalized.cancelled_at = String(cancelledAt);
     
     console.log('AdminService: Final normalized booking:', normalized);
     return normalized as BookingDetails;
@@ -308,6 +314,12 @@ export const adminService = {
           // Normalize timestamps for consistent sorting
           normalized.created_at = String(b.created_at ?? b.booking_created_at ?? b.createdAt ?? b.created ?? new Date().toISOString());
           normalized.updated_at = String(b.updated_at ?? b.booking_updated_at ?? b.updatedAt ?? b.updated ?? normalized.created_at);
+          const refundAmount = Number(b.refund_amount ?? b.refundAmount ?? b.refund ?? b.amount_refund ?? b.amountRefund ?? b.refund_due ?? b.refundDue ?? b.amount_due_customer ?? b.amount_due_to_customer);
+          if (!Number.isNaN(refundAmount)) normalized.refund_amount = refundAmount;
+          const cancelReason = b.cancellation_reason ?? b.cancel_reason ?? b.cancelReason ?? b.status_reason ?? b.reason;
+          if (cancelReason) normalized.cancellation_reason = String(cancelReason);
+          const cancelledAt = b.cancelled_at ?? b.canceled_at ?? b.cancelledAt ?? b.canceledAt;
+          if (cancelledAt) normalized.cancelled_at = String(cancelledAt);
           return normalized as BookingDetails;
         } catch {
           return b as BookingDetails;
@@ -389,6 +401,82 @@ export const adminService = {
     console.log('AdminService: Marking booking as paid, ID:', bookingId);
     const response = await apiClient.post(`/admin/bookings/${bookingId}/mark-paid`);
     console.log('AdminService: Mark as paid response:', response.data);
+  },
+
+  /**
+   * Mark a booking refund as processed (set payment_status to refunded)
+   */
+  markBookingRefunded: async (
+    data: { booking_id: number; amount?: number; reason?: string }
+  ): Promise<BookingDetails | null> => {
+    const payload: any = {
+      booking_id: Number(data.booking_id),
+      amount: data.amount,
+      refund_amount: data.amount,
+      refundAmount: data.amount,
+      reason: data.reason,
+      notes: data.reason,
+      action: 'refund',
+      status: 'refund',
+    };
+    payload.id = payload.booking_id;
+    payload.bookingId = payload.booking_id;
+
+    const candidatePaths = [
+      `/admin/bookings/${payload.booking_id}/refund`,
+      `/admin/bookings/${payload.booking_id}/mark-refunded`,
+      '/admin/bookings/refund',
+      '/admin/bookings/mark-refunded',
+      '/admin/refunds',
+      '/payments/refund',
+    ];
+
+    let lastError: any = null;
+    for (const path of candidatePaths) {
+      try {
+        const response = await apiClient.post<ApiResponse<BookingDetails | any>>(path, payload, {
+          headers: { 'X-Suppress-Error-Toast': '1' },
+        });
+
+        const raw = response?.data as any;
+        if (typeof raw?.success === 'boolean') {
+          if (!raw.success) throw new Error(raw?.message || 'Refund failed');
+          const bookingData = raw?.data ?? raw?.booking ?? null;
+          if (bookingData) {
+            (async () => {
+              const { logAudit } = await import('../lib/audit');
+              logAudit({
+                action: 'mark_refund',
+                entity: 'booking',
+                entityId: payload.booking_id,
+                metadata: { amount: data.amount, reason: data.reason },
+              });
+            })();
+            return bookingData as BookingDetails;
+          }
+          return null;
+        }
+
+        if (response.status >= 200 && response.status < 300) {
+          (async () => {
+            const { logAudit } = await import('../lib/audit');
+            logAudit({
+              action: 'mark_refund',
+              entity: 'booking',
+              entityId: payload.booking_id,
+              metadata: { amount: data.amount, reason: data.reason },
+            });
+          })();
+          return (raw?.data ?? raw?.booking ?? raw ?? null) as BookingDetails | null;
+        }
+      } catch (error) {
+        lastError = error;
+        continue;
+      }
+    }
+
+    const message = lastError?.response?.data?.message || lastError?.message || 'Failed to mark booking as refunded';
+    throw new Error(message);
   },
 };
 

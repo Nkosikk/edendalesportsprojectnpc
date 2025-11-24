@@ -54,6 +54,9 @@ export interface BookingDetails {
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   payment_status: 'pending' | 'paid' | 'refunded' | 'failed' | 'manual_pending';
   payment_method?: 'online' | 'eft' | 'cash' | 'card';
+  refund_amount?: number | null;
+  cancellation_reason?: string | null;
+  cancelled_at?: string | null;
   notes?: string;
   created_at: string;
   updated_at: string;

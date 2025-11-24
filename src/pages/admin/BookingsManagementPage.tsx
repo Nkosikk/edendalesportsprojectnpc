@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { adminService } from '../../services/adminService';
 import { paymentService } from '../../services/paymentService';
-import type { BookingDetails, AdminBookingFilters, UpdateBookingStatusRequest } from '../../types';
+import { fieldService } from '../../services/fieldsService';
+import type { BookingDetails, AdminBookingFilters, UpdateBookingStatusRequest, SportsField } from '../../types';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
 import { Table } from '../../components/ui/Table';
-import { formatCurrency } from '../../lib/utils';
+import { formatCurrency, getRefundAdjustedAmount, getExplicitRefundAmount } from '../../lib/utils';
 import { Card, CardContent } from '../../components/ui/Card';
 import InvoiceModal from '../../components/invoices/InvoiceModal';
+import { Modal } from '../../components/ui/Modal';
 import toast from 'react-hot-toast';
 import { FileText, MoreVertical, Eye, Edit, Check, X, DollarSign } from 'lucide-react';
 
@@ -20,6 +22,29 @@ const BookingsManagementPage: React.FC = () => {
   const [selectedBookingForInvoice, setSelectedBookingForInvoice] = useState<BookingDetails | null>(null);
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [processingPayment, setProcessingPayment] = useState<number | null>(null);
+  const [fieldOptions, setFieldOptions] = useState<SportsField[]>([]);
+  const [fieldsLoading, setFieldsLoading] = useState(false);
+  const [statusModal, setStatusModal] = useState<{
+    booking: BookingDetails | null;
+    status: UpdateBookingStatusRequest['status'];
+    reason: string;
+    refund: string;
+    submitting: boolean;
+  }>({ booking: null, status: 'pending', reason: '', refund: '', submitting: false });
+  const [emailModal, setEmailModal] = useState<{
+    booking: BookingDetails | null;
+    email: string;
+    subject: string;
+    message: string;
+    includePaymentLink: boolean;
+    sending: boolean;
+  }>({ booking: null, email: '', subject: '', message: '', includePaymentLink: true, sending: false });
+  const [refundModal, setRefundModal] = useState<{
+    booking: BookingDetails | null;
+    amount: string;
+    reason: string;
+    submitting: boolean;
+  }>({ booking: null, amount: '', reason: '', submitting: false });
   const lastErrorTimeRef = React.useRef<number>(0);
   // Keep track of rows we already auto-completed to avoid duplicate updates
   const autoCompletedRef = React.useRef<Set<number>>(new Set());
@@ -99,6 +124,22 @@ const BookingsManagementPage: React.FC = () => {
     setCurrentPage(1); // Reset to first page when filters change
   }, [filters]);
 
+  useEffect(() => {
+    const fetchFields = async () => {
+      try {
+        setFieldsLoading(true);
+        const data = await fieldService.getAllFields(true);
+        setFieldOptions(data);
+      } catch (error) {
+        console.error('Failed to load fields for filter', error);
+        setFieldOptions([]);
+      } finally {
+        setFieldsLoading(false);
+      }
+    };
+    fetchFields();
+  }, []);
+
   // Periodic refresh (60s) to capture external payment/status changes without manual reloads
   useEffect(() => {
     const interval = setInterval(() => {
@@ -121,11 +162,21 @@ const BookingsManagementPage: React.FC = () => {
     }
   }, [openDropdown]);
 
-  const updateStatus = async (booking_id: number, status: UpdateBookingStatusRequest['status']) => {
+  const updateStatus = async (
+    booking_id: number,
+    status: UpdateBookingStatusRequest['status'],
+    reason?: string,
+    refundAmount?: number
+  ) => {
     try {
       // Optimistic update
       setBookings(prev => prev.map(b => b.id === booking_id ? { ...b, status } : b));
-      await adminService.updateBookingStatus({ booking_id, status });
+      await adminService.updateBookingStatus({
+        booking_id,
+        status,
+        reason: reason?.trim() || undefined,
+        refund_amount: typeof refundAmount === 'number' ? refundAmount : undefined,
+      });
       toast.success('Status updated');
       load();
     } catch (e: any) {
@@ -133,6 +184,102 @@ const BookingsManagementPage: React.FC = () => {
       toast.error(msg);
       // Revert by reloading authoritative data
       load();
+      throw e;
+    }
+  };
+
+  const openStatusModal = (booking: BookingDetails, status: UpdateBookingStatusRequest['status']) => {
+    setStatusModal({
+      booking,
+      status,
+      reason: '',
+      refund: '',
+      submitting: false,
+    });
+  };
+
+  const closeStatusModal = () => {
+    setStatusModal((prev) => ({ ...prev, booking: null, reason: '', refund: '', submitting: false }));
+  };
+
+  const openRefundModal = (booking: BookingDetails) => {
+    const suggested = getExplicitRefundAmount(booking) ?? booking.refund_amount ?? booking.total_amount ?? 0;
+    setRefundModal({
+      booking,
+      amount: suggested ? String(Math.abs(suggested)) : '',
+      reason: '',
+      submitting: false,
+    });
+  };
+
+  const closeRefundModal = () => {
+    setRefundModal({ booking: null, amount: '', reason: '', submitting: false });
+  };
+
+  const handleStatusModalSubmit = async () => {
+    if (!statusModal.booking) return;
+    const requiresReason = statusModal.status === 'cancelled';
+    if (requiresReason && statusModal.reason.trim().length < 3) {
+      toast.error('Please provide a short reason for cancelling this booking.');
+      return;
+    }
+    const refundValue = statusModal.refund.trim()
+      ? Number(statusModal.refund)
+      : undefined;
+    if (refundValue !== undefined && (Number.isNaN(refundValue) || refundValue < 0)) {
+      toast.error('Refund amount must be a positive number.');
+      return;
+    }
+    try {
+      setStatusModal((prev) => ({ ...prev, submitting: true }));
+      await updateStatus(
+        statusModal.booking.id,
+        statusModal.status,
+        statusModal.reason,
+        refundValue
+      );
+      closeStatusModal();
+    } catch (error) {
+      console.error('Status update failed', error);
+      setStatusModal((prev) => ({ ...prev, submitting: false }));
+    }
+  };
+
+  const openEmailModal = (booking: BookingDetails) => {
+    setEmailModal({
+      booking,
+      email: booking.email,
+      subject: `Invoice for booking ${booking.booking_reference}`,
+      message: `Hi ${booking.first_name},\n\nPlease find your invoice for ${booking.field_name} on ${booking.booking_date}.\n\nThank you,\nEdendale Sports Projects`,
+      includePaymentLink: true,
+      sending: false,
+    });
+  };
+
+  const closeEmailModal = () => {
+    setEmailModal((prev) => ({
+      ...prev,
+      booking: null,
+      sending: false,
+      email: '',
+      subject: '',
+      message: '',
+    }));
+  };
+
+  const handleSendInvoice = async () => {
+    if (!emailModal.booking) return;
+    if (!emailModal.email) {
+      toast.error('Recipient email is required');
+      return;
+    }
+    try {
+      setEmailModal((prev) => ({ ...prev, sending: true }));
+      toast('Invoice emailing is coming soon.');
+      closeEmailModal();
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to email invoice');
+      setEmailModal((prev) => ({ ...prev, sending: false }));
     }
   };
 
@@ -279,7 +426,7 @@ const BookingsManagementPage: React.FC = () => {
 
       <Card className="mb-4">
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
               <select
@@ -310,6 +457,26 @@ const BookingsManagementPage: React.FC = () => {
               </select>
             </div>
             <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Field</label>
+              <select
+                value={filters.field_id || ''}
+                onChange={(e) => setFilters({
+                  ...filters,
+                  field_id: e.target.value ? Number(e.target.value) : undefined,
+                })}
+                className="px-3 py-2 border rounded-lg w-full text-sm"
+                disabled={fieldsLoading}
+              >
+                <option value="">All Fields</option>
+                {fieldOptions.map((field) => (
+                  <option key={field.id} value={field.id}>{field.name}</option>
+                ))}
+              </select>
+              {fieldsLoading && (
+                <p className="text-[11px] text-gray-500 mt-1">Loading fields…</p>
+              )}
+            </div>
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
               <input
                 type="date"
@@ -333,7 +500,7 @@ const BookingsManagementPage: React.FC = () => {
                 type="text"
                 value={filters.user_search || ''}
                 onChange={(e) => setFilters({ ...filters, user_search: e.target.value || undefined })}
-                placeholder="Name, email, field"
+                placeholder="Name, email, ref"
                 className="px-3 py-2 border rounded-lg w-full text-sm"
               />
             </div>
@@ -404,11 +571,17 @@ const BookingsManagementPage: React.FC = () => {
                 { 
                   key: 'total_amount', 
                   title: 'Amount', 
-                  render: (v: any) => {
-                    const num = Number(v);
+                  render: (_: any, r: BookingDetails) => {
+                    const displayAmount = getRefundAdjustedAmount(r);
+                    const refundDue = getExplicitRefundAmount(r);
                     return (
                       <div className="text-sm font-medium">
-                        {Number.isFinite(num) ? formatCurrency(num) : '—'}
+                        {formatCurrency(Math.abs(displayAmount))}
+                        {displayAmount < 0 && (
+                          <span className="block text-[11px] text-red-600">
+                            Refund{refundDue ? ` (${formatCurrency(refundDue)})` : ''}
+                          </span>
+                        )}
                       </div>
                     );
                   } 
@@ -501,6 +674,16 @@ const BookingsManagementPage: React.FC = () => {
                               <FileText className="h-4 w-4" />
                               View Invoice
                             </button>
+                            <button
+                              onClick={() => {
+                                openEmailModal(row);
+                                setOpenDropdown(null);
+                              }}
+                              className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                            >
+                              <FileText className="h-4 w-4" />
+                              Email Invoice
+                            </button>
 
                             {/* Separator */}
                             <div className="border-t my-1"></div>
@@ -509,7 +692,7 @@ const BookingsManagementPage: React.FC = () => {
                             {row.status === 'pending' && (
                               <button
                                 onClick={() => {
-                                  updateStatus(row.id, 'confirmed');
+                                  openStatusModal(row, 'confirmed');
                                   setOpenDropdown(null);
                                 }}
                                 className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-green-600"
@@ -535,7 +718,7 @@ const BookingsManagementPage: React.FC = () => {
                             {(row.status === 'pending' || row.status === 'confirmed') && (
                               <button
                                 onClick={() => {
-                                  updateStatus(row.id, 'cancelled');
+                                  openStatusModal(row, 'cancelled');
                                   setOpenDropdown(null);
                                 }}
                                 className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600"
@@ -662,6 +845,21 @@ const BookingsManagementPage: React.FC = () => {
                                 </button>
                               </>
                             )}
+                            {row.status === 'cancelled' && row.payment_status !== 'refunded' && (
+                              <>
+                                <div className="border-t my-1"></div>
+                                <button
+                                  onClick={() => {
+                                    openRefundModal(row);
+                                    setOpenDropdown(null);
+                                  }}
+                                  className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-purple-600"
+                                >
+                                  <DollarSign className="h-4 w-4" />
+                                  Mark Refunded
+                                </button>
+                              </>
+                            )}
                           </div>
                         </div>
                       )}
@@ -727,6 +925,213 @@ const BookingsManagementPage: React.FC = () => {
           onClose={() => setSelectedBookingForInvoice(null)}
           booking={selectedBookingForInvoice}
         />
+      )}
+
+      {statusModal.booking && (
+        <Modal
+          isOpen={!!statusModal.booking}
+          onClose={closeStatusModal}
+          title={
+            statusModal.status === 'cancelled'
+              ? 'Cancel booking'
+              : statusModal.status === 'confirmed'
+              ? 'Confirm booking'
+              : 'Update booking status'
+          }
+          size="md"
+          footer={
+            <>
+              <Button variant="outline" onClick={closeStatusModal} disabled={statusModal.submitting}>
+                Close
+              </Button>
+              <Button onClick={handleStatusModalSubmit} loading={statusModal.submitting}>
+                Save
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4 text-sm">
+            <p className="text-gray-600">
+              {statusModal.status === 'cancelled'
+                ? 'Provide a reason for cancelling this booking. Customers will see this reason in their records.'
+                : 'Confirming the booking will lock in the selected slot for the customer.'}
+            </p>
+            <div className="bg-gray-50 border rounded p-3 text-xs text-gray-700">
+              <div className="font-semibold">{statusModal.booking.field_name}</div>
+              <div>Ref: {statusModal.booking.booking_reference}</div>
+              <div>Date: {statusModal.booking.booking_date}</div>
+              <div>Time: {statusModal.booking.start_time?.slice(0,5)} - {statusModal.booking.end_time?.slice(0,5)}</div>
+            </div>
+            {(statusModal.status === 'cancelled' || statusModal.status === 'confirmed') && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">
+                  Reason {statusModal.status === 'cancelled' ? '(required)' : '(optional)'}
+                </label>
+                <textarea
+                  value={statusModal.reason}
+                  onChange={(e) => setStatusModal((prev) => ({ ...prev, reason: e.target.value }))}
+                  rows={3}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                  placeholder={statusModal.status === 'cancelled' ? 'Explain why this booking is being cancelled' : 'Add an internal note'}
+                />
+              </div>
+            )}
+            {statusModal.status === 'cancelled' && (
+              <div>
+                <label className="block text-xs font-semibold text-gray-700 mb-1">Refund amount (optional)</label>
+                <input
+                  type="number"
+                  min={0}
+                  step={50}
+                  value={statusModal.refund}
+                  onChange={(e) => setStatusModal((prev) => ({ ...prev, refund: e.target.value }))}
+                  className="w-full border rounded px-3 py-2 text-sm"
+                  placeholder="0.00"
+                />
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
+
+      {emailModal.booking && (
+        <Modal
+          isOpen={!!emailModal.booking}
+          onClose={closeEmailModal}
+          title="Email Invoice"
+          size="md"
+          footer={
+            <>
+              <Button variant="outline" onClick={closeEmailModal} disabled={emailModal.sending}>
+                Close
+              </Button>
+              <Button onClick={handleSendInvoice} loading={emailModal.sending}>
+                Send Email
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4 text-sm">
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Recipient</label>
+              <input
+                type="email"
+                value={emailModal.email}
+                onChange={(e) => setEmailModal((prev) => ({ ...prev, email: e.target.value }))}
+                className="w-full border rounded px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Subject</label>
+              <input
+                type="text"
+                value={emailModal.subject}
+                onChange={(e) => setEmailModal((prev) => ({ ...prev, subject: e.target.value }))}
+                className="w-full border rounded px-3 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Message</label>
+              <textarea
+                rows={4}
+                value={emailModal.message}
+                onChange={(e) => setEmailModal((prev) => ({ ...prev, message: e.target.value }))}
+                className="w-full border rounded px-3 py-2 text-sm"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-xs font-semibold text-gray-700">
+              <input
+                type="checkbox"
+                checked={emailModal.includePaymentLink}
+                onChange={(e) => setEmailModal((prev) => ({ ...prev, includePaymentLink: e.target.checked }))}
+              />
+              Include payment link
+            </label>
+          </div>
+        </Modal>
+      )}
+
+      {refundModal.booking && (
+        <Modal
+          isOpen={!!refundModal.booking}
+          onClose={closeRefundModal}
+          title="Mark refund processed"
+          size="md"
+          footer={
+            <>
+              <Button variant="outline" onClick={closeRefundModal} disabled={refundModal.submitting}>
+                Close
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!refundModal.booking) return;
+                  const amountValue = refundModal.amount.trim() ? Number(refundModal.amount) : undefined;
+                  if (amountValue !== undefined && (Number.isNaN(amountValue) || amountValue < 0)) {
+                    toast.error('Refund amount must be zero or positive.');
+                    return;
+                  }
+                  try {
+                    setRefundModal((prev) => ({ ...prev, submitting: true }));
+                    await adminService.markBookingRefunded({
+                      booking_id: refundModal.booking.id,
+                      amount: amountValue,
+                      reason: refundModal.reason || 'Refund processed',
+                    });
+                    setBookings((prev) =>
+                      prev.map((b) =>
+                        b.id === refundModal.booking?.id
+                          ? { ...b, payment_status: 'refunded', refund_amount: amountValue ?? b.refund_amount }
+                          : b
+                      )
+                    );
+                    toast.success('Booking marked as refunded');
+                    closeRefundModal();
+                  } catch (error: any) {
+                    toast.error(error?.message || 'Failed to mark as refunded');
+                    setRefundModal((prev) => ({ ...prev, submitting: false }));
+                  }
+                }}
+                loading={refundModal.submitting}
+              >
+                Save
+              </Button>
+            </>
+          }
+        >
+          <div className="space-y-4 text-sm">
+            <p className="text-gray-600">
+              Record that the refund has been paid back to the customer. This updates the payment status to <strong>Refunded</strong> on the customer portal.
+            </p>
+            <div className="bg-gray-50 border rounded p-3 text-xs text-gray-700">
+              <div className="font-semibold">{refundModal.booking.field_name}</div>
+              <div>Ref: {refundModal.booking.booking_reference}</div>
+              <div>Date: {refundModal.booking.booking_date}</div>
+              <div>Customer: {refundModal.booking.first_name} {refundModal.booking.last_name}</div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Refund amount (optional)</label>
+              <input
+                type="number"
+                min={0}
+                step={50}
+                value={refundModal.amount}
+                onChange={(e) => setRefundModal((prev) => ({ ...prev, amount: e.target.value }))}
+                className="w-full border rounded px-3 py-2 text-sm"
+                placeholder="0.00"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-gray-700 mb-1">Reference / notes</label>
+              <textarea
+                rows={3}
+                value={refundModal.reason}
+                onChange={(e) => setRefundModal((prev) => ({ ...prev, reason: e.target.value }))}
+                className="w-full border rounded px-3 py-2 text-sm"
+                placeholder="e.g. EFT refund processed on 24 Nov"
+              />
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

@@ -10,6 +10,19 @@ const ProfilePage: React.FC = () => {
     last_name: user?.last_name || '',
     phone: user?.phone || '',
   });
+
+  const deriveAccountStatus = () => {
+    const statusValue = user?.is_active ?? user?.status ?? user?.account_status ?? user?.isActive ?? user?.active;
+    if (typeof statusValue === 'boolean') {
+      return statusValue ? 'Active' : 'Inactive';
+    }
+    if (typeof statusValue === 'string') {
+      const normalized = statusValue.toLowerCase();
+      if (['active', 'enabled', '1', 'true', 'yes'].includes(normalized)) return 'Active';
+      if (['inactive', 'disabled', '0', 'false', 'no'].includes(normalized)) return 'Inactive';
+    }
+    return 'Active';
+  };
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -56,7 +69,7 @@ const ProfilePage: React.FC = () => {
         </div>
         <div className="rounded-lg border bg-white p-4 shadow-sm">
           <p className="text-xs text-gray-500">Account Status</p>
-          <p className="text-lg font-semibold">{user.is_active ? 'Active' : 'Inactive'}</p>
+          <p className="text-lg font-semibold">{deriveAccountStatus()}</p>
         </div>
       </div>
       <form onSubmit={handleSubmit} className="space-y-4 bg-white border rounded-lg p-6 shadow-sm">

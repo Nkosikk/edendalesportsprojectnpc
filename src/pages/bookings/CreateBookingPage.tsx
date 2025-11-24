@@ -8,7 +8,7 @@ import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import { SportsField } from '../../types';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { toApiTime } from '../../utils/scheduling';
+import { normalizeTimeHM } from '../../utils/scheduling';
 
 const CreateBookingPage = () => {
   const [fieldId, setFieldId] = useState<number | null>(null);
@@ -50,8 +50,8 @@ const CreateBookingPage = () => {
       return bookingService.createBooking({
         field_id: fieldId,
         booking_date: formatLocalYMD(date),
-        start_time: toApiTime(startTime),
-        end_time: toApiTime(endTime),
+        start_time: normalizeTimeHM(startTime),
+        end_time: normalizeTimeHM(endTime),
         notes: notes || undefined,
       });
     },

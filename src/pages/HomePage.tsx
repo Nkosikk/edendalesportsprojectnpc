@@ -94,7 +94,7 @@ const HomePage = () => {
       <section className="bg-gradient-to-r from-primary-50 to-blue-50 py-3">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h1 className="text-xl md:text-3xl font-bold text-gray-900 mb-2">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 mb-2">
               Book Your Perfect <span className="text-primary-600">Sports Field 🚀</span>
             </h1>
             <p className="text-sm text-gray-600 max-w-2xl mx-auto">
@@ -112,7 +112,7 @@ const HomePage = () => {
               <CardTitle className="text-base">Quick Booking</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Field</label>
                   {loadingFields ? (
@@ -173,7 +173,7 @@ const HomePage = () => {
                 ) : !availability ? (
                   <p className="text-gray-500 text-sm">Select options and click Search to view available and blocked slots.</p>
                 ) : (
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="lg:col-span-2">
                       <h3 className="text-base font-semibold mb-2">Time Slots</h3>
                       {availability.slots.length === 0 ? (

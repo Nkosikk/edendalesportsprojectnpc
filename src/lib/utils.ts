@@ -1,5 +1,7 @@
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import type { BookingDetails } from '../types';
+import { UserRole } from '../types';
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -86,6 +88,12 @@ export const formatCurrency = (amount: number | null | undefined) => {
   }
 };
 
+export const safeNumber = (value: any, defaultValue: number = 0): number => {
+  if (typeof value === 'number' && !isNaN(value)) return value;
+  const parsed = Number(value);
+  return isNaN(parsed) ? defaultValue : parsed;
+};
+
 export const getInitials = (firstName: string, lastName: string) => {
   return `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
 };
@@ -95,8 +103,135 @@ export const truncateText = (text: string, maxLength: number = 100) => {
   return text.substring(0, maxLength) + '...';
 };
 
-export const safeNumber = (value: any, defaultValue: number = 0): number => {
-  if (typeof value === 'number' && !isNaN(value)) return value;
-  const parsed = Number(value);
-  return isNaN(parsed) ? defaultValue : parsed;
+const coerceTime = (time?: string | null) => {
+  if (!time) return '00:00:00';
+  if (time.length === 5) return `${time}:00`;
+  if (time.length === 8) return time;
+  return time;
+};
+
+const parseBookingDateTime = (booking?: Pick<BookingDetails, 'booking_date' | 'start_time'> | null) => {
+  if (!booking?.booking_date || !booking?.start_time) return null;
+  const isoCandidate = `${booking.booking_date}T${coerceTime(booking.start_time)}`;
+  const parsed = new Date(isoCandidate);
+  return isNaN(parsed.getTime()) ? null : parsed;
+};
+
+export const hoursUntilBookingStart = (
+  booking?: Pick<BookingDetails, 'booking_date' | 'start_time'> | null
+): number | null => {
+  const start = parseBookingDateTime(booking);
+  if (!start) return null;
+  const diffMs = start.getTime() - Date.now();
+  return diffMs / (1000 * 60 * 60);
+};
+
+const isPrivilegedRole = (role?: string | UserRole | null) => {
+  if (!role) return false;
+  const normalized = typeof role === 'string' ? role.toLowerCase() : role;
+  return normalized === UserRole.Admin || normalized === UserRole.Staff;
+};
+
+export const canUserCancelBooking = (
+  booking: BookingDetails | null | undefined,
+  role?: string | UserRole | null
+): boolean => {
+  if (!booking) return false;
+  if (booking.status !== 'pending' && booking.status !== 'confirmed') return false;
+  if (isPrivilegedRole(role)) return true;
+  const hoursUntil = hoursUntilBookingStart(booking);
+  if (hoursUntil === null) return true;
+  return hoursUntil >= 24;
+};
+
+export const getCancellationRestrictionMessage = (
+  booking: BookingDetails | null | undefined,
+  role?: string | UserRole | null
+): string | null => {
+  if (!booking) return null;
+  if (booking.status === 'cancelled') return 'Booking already cancelled.';
+  if (booking.status === 'completed') return 'Completed bookings cannot be cancelled.';
+  if (isPrivilegedRole(role)) return null;
+  const hoursUntil = hoursUntilBookingStart(booking);
+  if (hoursUntil !== null && hoursUntil < 24) {
+    return 'Cancellations are only allowed up to 24 hours before start time.';
+  }
+  return null;
+};
+
+const REFUND_KEYS = [
+  'refund_amount',
+  'refundAmount',
+  'refund',
+  'amount_refund',
+  'amountRefund',
+  'refund_due',
+  'refundDue',
+  'amount_due_customer',
+  'amount_due_to_customer',
+  'customer_refund',
+];
+
+const BALANCE_KEYS = [
+  'balance',
+  'balance_due',
+  'amount_due',
+  'amountDue',
+  'outstanding_balance',
+  'outstandingBalance',
+];
+
+const coerceRefundValue = (source: any): number | undefined => {
+  for (const key of REFUND_KEYS) {
+    if (source && Object.prototype.hasOwnProperty.call(source, key)) {
+      const value = safeNumber(source[key], NaN);
+      if (!Number.isNaN(value)) return value;
+    }
+  }
+  return undefined;
+};
+
+const coerceNegativeBalance = (source: any): number | undefined => {
+  for (const key of BALANCE_KEYS) {
+    if (source && Object.prototype.hasOwnProperty.call(source, key)) {
+      const value = safeNumber(source[key], NaN);
+      if (!Number.isNaN(value) && value < 0) return value;
+    }
+  }
+  return undefined;
+};
+
+export const getExplicitRefundAmount = (
+  booking: BookingDetails | null | undefined
+): number | null => {
+  if (!booking) return null;
+  const value = coerceRefundValue(booking);
+  if (value === undefined || Number.isNaN(value)) return null;
+  return Math.abs(value);
+};
+
+export const getRefundAdjustedAmount = (
+  booking: BookingDetails | null | undefined
+): number => {
+  if (!booking) return 0;
+  const refundValue = coerceRefundValue(booking);
+  if (refundValue !== undefined && refundValue > 0) {
+    return -Math.abs(refundValue);
+  }
+
+  const negativeBalance = coerceNegativeBalance(booking);
+  if (negativeBalance !== undefined) {
+    return negativeBalance;
+  }
+
+  const total = safeNumber((booking as any)?.total_amount ?? (booking as any)?.amount ?? 0);
+  if (
+    booking.status === 'cancelled' &&
+    (booking.payment_status === 'paid' || booking.payment_status === 'refunded') &&
+    total > 0
+  ) {
+    return -Math.abs(total);
+  }
+
+  return total;
 };

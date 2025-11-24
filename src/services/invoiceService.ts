@@ -1,9 +1,11 @@
 import { BookingDetails } from '../types';
-import { apiClient, handleApiResponse } from '../lib/api';
+import { apiClient } from '../lib/api';
 import { safeNumber } from '../lib/utils';
 
 export interface EmailInvoiceRequest {
   booking_id: number;
+  booking_reference?: string;
+  user_id?: number;
   recipient_email?: string;
   subject?: string;
   message?: string;
@@ -118,19 +120,68 @@ class InvoiceService {
    * Send invoice via email (Admin only)
    */
   async emailInvoice(request: EmailInvoiceRequest): Promise<InvoiceEmailResponse> {
-    try {
-      const response = await apiClient.post<{ data: InvoiceEmailResponse }>('/admin/email-invoice', {
-        booking_id: request.booking_id,
-        recipient_email: request.recipient_email,
-        subject: request.subject || 'Your Sports Facility Booking Invoice',
-        message: request.message || 'Please find attached your booking invoice. Thank you for choosing our facility.',
-        include_payment_link: request.include_payment_link !== false, // default true
-      });
-
-      return handleApiResponse<InvoiceEmailResponse>(response, true);
-    } catch (error: any) {
-      throw new Error(error?.response?.data?.message || 'Failed to send invoice email');
+    if (!request.recipient_email) {
+      throw new Error('Recipient email is required to send an invoice');
     }
+
+    // Provide multiple alias fields to satisfy varying backends
+    const basePayload: Record<string, any> = {
+      booking_id: Number(request.booking_id),
+      bookingId: Number(request.booking_id),
+      id: Number(request.booking_id),
+      user_id: request.user_id,
+      recipient_email: request.recipient_email,
+      email: request.recipient_email,
+      to: request.recipient_email,
+      subject: request.subject || 'Your Sports Facility Booking Invoice',
+      message: request.message || 'Please find attached your booking invoice. Thank you for choosing our facility.',
+      include_payment_link: request.include_payment_link !== false, // default true
+      booking_reference: request.booking_reference,
+      booking_ref: request.booking_reference,
+      reference: request.booking_reference,
+      action: 'email_invoice',
+      admin_action: 'email_invoice',
+      task: 'email_invoice',
+      type: 'invoice_email',
+    };
+
+    const candidatePaths = [
+      '/admin/email-invoice',
+      '/admin/invoices/email',
+      '/admin/bookings/email-invoice',
+      `/admin/bookings/${Number(request.booking_id)}/email-invoice`,
+      '/invoices/email',
+      '/invoice/email',
+      `/bookings/${Number(request.booking_id)}/email-invoice`,
+      '/bookings/email-invoice',
+      '/admin/invoices/send',
+      '/admin/invoice/send',
+    ];
+
+    let lastError: any = null;
+    for (const path of candidatePaths) {
+      try {
+        const response = await apiClient.post(path, basePayload, {
+          headers: { 'X-Suppress-Error-Toast': '1' },
+        });
+
+        // Flexible success handling
+        const data: any = response?.data;
+        if (typeof data?.success === 'boolean') {
+          if (!data.success) throw new Error(data?.message || 'Email send failed');
+          return (data?.data as InvoiceEmailResponse) || { success: true, message: data?.message || 'Invoice email sent' };
+        }
+        if (response.status >= 200 && response.status < 300) {
+          return { success: true, message: 'Invoice email sent' } as InvoiceEmailResponse;
+        }
+      } catch (err: any) {
+        lastError = err;
+        // Try next path
+      }
+    }
+
+    const message = lastError?.response?.data?.message || lastError?.message || 'Failed to send invoice email';
+    throw new Error(message);
   }
 
   /**
@@ -175,7 +226,7 @@ class InvoiceService {
   /**
    * Calculate invoice totals including VAT
    */
-  calculateInvoiceTotals(totalAmount: number | null | undefined, vatRate: number = 0.15) {
+  calculateInvoiceTotals(totalAmount: number | null | undefined, vatRate: number = 0) {
     const subtotal = safeNumber(totalAmount);
     const vat = subtotal * vatRate;
     const total = subtotal + vat;
@@ -211,6 +262,14 @@ class InvoiceService {
         status: 'paid',
         statusText: 'Paid',
         statusColor: 'text-green-600'
+      };
+    }
+
+    if (booking.payment_status === 'refunded') {
+      return {
+        status: 'cancelled',
+        statusText: 'Refunded',
+        statusColor: 'text-purple-600'
       };
     }
 

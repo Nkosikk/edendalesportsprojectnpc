@@ -7,6 +7,7 @@ import { invoiceService } from '../../services/invoiceService';
 import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { Download, Mail, FileText } from 'lucide-react';
+import { getRefundAdjustedAmount, getExplicitRefundAmount, formatCurrency } from '../../lib/utils';
 
 interface InvoiceModalProps {
   isOpen: boolean;
@@ -48,15 +49,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
     try {
       setEmailSending(true);
-      await invoiceService.emailInvoice({
-        booking_id: booking.id,
-        recipient_email: emailData.recipient,
-        subject: emailData.subject,
-        message: emailData.message,
-        include_payment_link: booking.payment_status !== 'paid'
-      });
-      toast.success('Invoice sent successfully');
-      onClose();
+      toast('Invoice emailing is coming soon.');
     } catch (error: any) {
       toast.error(error.message || 'Failed to send invoice');
     } finally {
@@ -65,7 +58,9 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   };
 
   const validation = invoiceService.validateInvoiceData(booking);
-  const invoiceTotals = invoiceService.calculateInvoiceTotals(booking?.total_amount);
+  const adjustedAmount = getRefundAdjustedAmount(booking);
+  const refundDue = getExplicitRefundAmount(booking);
+  const invoiceTotals = invoiceService.calculateInvoiceTotals(Math.abs(adjustedAmount));
   const invoiceStatus = invoiceService.getInvoiceStatus(booking);
 
   if (!validation.isValid) {
@@ -106,8 +101,13 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
             </div>
             <div className="text-right">
               <p><span className="text-gray-600">Subtotal:</span> R{(invoiceTotals.subtotal || 0).toFixed(2)}</p>
-              <p><span className="text-gray-600">VAT (15%):</span> R{(invoiceTotals.vat || 0).toFixed(2)}</p>
+              <p><span className="text-gray-600">VAT (0%):</span> R{(invoiceTotals.vat || 0).toFixed(2)}</p>
               <p className="font-medium"><span className="text-gray-600">Total:</span> R{(invoiceTotals.total || 0).toFixed(2)}</p>
+              {adjustedAmount < 0 && (
+                <p className="text-xs font-semibold text-red-600 mt-1">
+                  Refund owed {refundDue ? `(${formatCurrency(refundDue)})` : ''}
+                </p>
+              )}
             </div>
           </div>
         </div>

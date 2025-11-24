@@ -1,6 +1,12 @@
 import React from 'react';
 import { BookingDetails } from '../../types';
-import { formatCurrency, formatDate, formatTime } from '../../lib/utils';
+import {
+  formatCurrency,
+  formatDate,
+  formatTime,
+  getRefundAdjustedAmount,
+  getExplicitRefundAmount,
+} from '../../lib/utils';
 
 interface InvoiceData extends BookingDetails {
   invoiceNumber: string;
@@ -43,6 +49,9 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
     dueDate: booking.status === 'pending' ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined,
     companyInfo: defaultCompanyInfo
   };
+  const lineAmount = getRefundAdjustedAmount(booking);
+  const displayAmount = Math.abs(lineAmount);
+  const refundDue = getExplicitRefundAmount(booking);
 
   return (
     <div className="max-w-4xl mx-auto bg-white p-8 shadow-lg" id="invoice-content">
@@ -130,7 +139,7 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                 {formatCurrency(invoiceData.hourly_rate)}
               </td>
               <td className="border border-gray-300 px-4 py-2 text-right">
-                {formatCurrency(invoiceData.total_amount)}
+                {formatCurrency(displayAmount)}
               </td>
             </tr>
           </tbody>
@@ -142,16 +151,21 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
         <div className="w-64">
           <div className="flex justify-between py-2 border-b border-gray-300">
             <span className="font-medium">Subtotal:</span>
-            <span>{formatCurrency(invoiceData.total_amount)}</span>
+            <span>{formatCurrency(displayAmount)}</span>
           </div>
           <div className="flex justify-between py-2 border-b border-gray-300">
-            <span className="font-medium">VAT (15%):</span>
-            <span>{formatCurrency(invoiceData.total_amount * 0.15)}</span>
+            <span className="font-medium">VAT (0%):</span>
+            <span>{formatCurrency(0)}</span>
           </div>
           <div className="flex justify-between py-3 text-lg font-bold border-b-2 border-gray-900">
             <span>Total:</span>
-            <span>{formatCurrency(invoiceData.total_amount * 1.15)}</span>
+            <span>{formatCurrency(displayAmount * 1.15)}</span>
           </div>
+          {lineAmount < 0 && (
+            <p className="text-xs text-red-600 font-semibold mt-2">
+              Refund owed {refundDue ? `(${formatCurrency(refundDue)})` : ''}
+            </p>
+          )}
         </div>
       </div>
 
@@ -187,7 +201,17 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
       </div>
 
       {/* Payment Instructions */}
-      {invoiceData.payment_status !== 'paid' && (
+      {lineAmount < 0 && (
+        <div className="mb-8 bg-red-50 p-4 rounded">
+          <h4 className="font-semibold text-red-900 mb-2">Refund Notice</h4>
+          <p className="text-sm text-red-800">
+            A refund of {refundDue ? formatCurrency(refundDue) : formatCurrency(Math.abs(lineAmount))} is owed to the customer. Our finance
+            team will process this shortly.
+          </p>
+        </div>
+      )}
+
+      {invoiceData.payment_status !== 'paid' && lineAmount >= 0 && (
         <div className="mb-8 bg-blue-50 p-4 rounded">
           <h4 className="font-semibold text-gray-900 mb-2">Payment Instructions</h4>
           <div className="text-sm text-gray-700 space-y-1">

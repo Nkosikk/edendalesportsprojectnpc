@@ -46,14 +46,16 @@ apiClient.interceptors.response.use(
     return response;
   },
   async (error) => {
-    const originalRequest = error.config;
+    const originalRequest = error.config || {};
+    const urlPath = (originalRequest.url || '').toLowerCase();
+    const isAuthLoginOrRegister = urlPath.includes('/auth/login') || urlPath.includes('/auth/register');
 
-    // Handle 401 errors (unauthorized) - no refresh flow in backend
-    if (error.response?.status === 401 && !originalRequest?._retry) {
-      if (originalRequest) originalRequest._retry = true;
+    // Handle 401 errors (unauthorized) - but do NOT redirect for login/register failures
+    if (error.response?.status === 401 && !originalRequest?._retry && !isAuthLoginOrRegister) {
+      if (originalRequest) (originalRequest as any)._retry = true;
       localStorage.removeItem('accessToken');
       localStorage.removeItem('user');
-      // Redirect to login
+      // Redirect to login for general 401s
       window.location.href = '/login';
       return Promise.reject(error);
     }

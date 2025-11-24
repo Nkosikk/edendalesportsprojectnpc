@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, User, LogOut, Settings, Calendar, Home, Users, Building, BarChart3, FileText } from 'lucide-react';
+import { Menu, X, User, LogOut, Settings, Calendar, Home, Users, Building, BarChart3, FileText, Megaphone } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../ui/Button';
 import LogoImg from '../../assets/images/ESP-BLUE-2.png';
@@ -31,23 +31,42 @@ const Header = () => {
     { name: 'Fields', href: '/admin/fields', icon: Building },
     { name: 'Revenue', href: '/admin/reports/revenue', icon: FileText },
     { name: 'Analytics', href: '/admin/reports/analytics', icon: BarChart3 },
+    { name: 'Communication', href: '/admin/communication', icon: Megaphone },
   ];
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center py-1">
-          {/* Logo */}
-          <Link to="/" className="flex flex-col items-center">
-            <img
-              src={LogoImg}
-              alt="Edendale Sports Logo"
-              className="h-32 w-auto object-contain"
-            />
-            <div className="text-center -mt-4">
-              <div className="text-lg font-bold text-gray-900">Edendale Sports Projects</div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between py-3">
+          <div className="flex items-center justify-between gap-3">
+            {/* Logo */}
+            <Link to="/" className="flex flex-col items-center sm:flex-row sm:gap-3">
+              <img
+                src={LogoImg}
+                alt="Edendale Sports Logo"
+                className="h-16 w-auto object-contain sm:h-20 lg:h-24 transition-all"
+              />
+              <div className="text-center sm:text-left -mt-2 sm:mt-0">
+                <div className="text-base font-bold text-gray-900 sm:text-lg">Edendale Sports Projects</div>
+                <p className="text-xs text-gray-500 hidden sm:block">Sports facility bookings made easy</p>
+              </div>
+            </Link>
+
+            {/* Mobile menu button */}
+            <div className="md:hidden">
+              <button
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                className="text-gray-500 hover:text-gray-700 focus:outline-none focus:text-gray-700"
+                aria-label="Toggle navigation menu"
+              >
+                {isMenuOpen ? (
+                  <X className="h-6 w-6" />
+                ) : (
+                  <Menu className="h-6 w-6" />
+                )}
+              </button>
             </div>
-          </Link>
+          </div>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex space-x-8">
@@ -170,19 +189,6 @@ const Header = () => {
             )}
           </div>
 
-          {/* Mobile menu button */}
-          <div className="md:hidden">
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="text-gray-500 hover:text-gray-700 focus:outline-none focus:text-gray-700"
-            >
-              {isMenuOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <Menu className="h-6 w-6" />
-              )}
-            </button>
-          </div>
         </div>
 
         {/* Mobile Navigation */}

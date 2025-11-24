@@ -34,13 +34,13 @@ export function Table<T>({
 
   return (
     <div className={`overflow-x-auto ${className}`}>
-      <table className="min-w-full divide-y divide-gray-200 bg-white shadow-md rounded-lg">
+      <table className="min-w-full divide-y divide-gray-200 bg-white shadow-md rounded-lg text-xs sm:text-sm">
         <thead className="bg-gray-50">
           <tr>
             {columns.map((column) => (
               <th
                 key={column.key}
-                className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${column.className || ''}`}
+                className={`px-3 py-2 sm:px-5 sm:py-3 text-left text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider ${column.className || ''}`}
               >
                 {column.title}
               </th>
@@ -55,7 +55,10 @@ export function Table<T>({
               className={onRowClick ? 'hover:bg-gray-50 cursor-pointer transition-colors' : ''}
             >
               {columns.map((column) => (
-                <td key={column.key} className={`px-6 py-4 whitespace-nowrap ${column.className || ''}`}>
+                <td
+                  key={column.key}
+                  className={`px-3 py-3 sm:px-5 sm:py-4 whitespace-normal sm:whitespace-nowrap align-top ${column.className || ''}`}
+                >
                   {column.render
                     ? column.render((row as any)[column.key], row, index)
                     : (row as any)[column.key]}

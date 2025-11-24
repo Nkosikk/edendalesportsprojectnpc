@@ -18,7 +18,14 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
   const [mergedSlots, setMergedSlots] = useState<AvailabilityMergedSlot[]>([]);
   const [selectedStart, setSelectedStart] = useState<string | null>(null);
 
-  const dateStr = date.toISOString().split('T')[0];
+  const toLocalYMD = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const dateStr = toLocalYMD(date);
   const durationHours = Math.max(1, Number(duration) || 1);
 
   // Check if time slot is within operating hours
@@ -141,48 +148,80 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
           })();
           const disabled = baseUnavailable || !canStartHere;
           const isBooked = !slot.available && !slot.blocked && withinHours;
+          const isAvailable = !disabled && withinHours && slot.available && !slot.blocked;
           const title = !withinHours 
             ? 'Outside operating hours'
             : !baseUnavailable && !canStartHere
             ? 'Not enough continuous availability for selected duration'
             : undefined;
+          
+          // Enhanced styling similar to home page
+          let buttonClasses = 'relative rounded-lg border p-3 text-center text-xs font-medium transition ';
+          
+          if (isSelected) {
+            buttonClasses += 'ring-2 ring-primary-600 border-primary-600 bg-primary-50 text-primary-700 ';
+          } else if (isAvailable) {
+            buttonClasses += 'border-green-200 bg-green-50 text-green-800 hover:bg-green-100 cursor-pointer ';
+          } else if (isBooked) {
+            buttonClasses += 'border-red-200 bg-red-50 text-red-600 cursor-not-allowed ';
+          } else if (slot.blocked) {
+            buttonClasses += 'border-orange-200 bg-orange-50 text-orange-600 cursor-not-allowed ';
+          } else {
+            buttonClasses += 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed ';
+          }
+          
           return (
             <button
               key={slot.start}
               disabled={disabled}
               title={title}
               onClick={() => handleSelect(slot.start)}
-              className={`
-                relative rounded-lg border p-3 text-center text-xs font-medium transition
-                ${disabled ? 
-                  isBooked ? 'bg-gray-300 text-gray-600 cursor-not-allowed' : 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                  : 'bg-white hover:bg-primary-50'
-                }
-                ${isSelected ? 'ring-2 ring-primary-600 border-primary-600' : ''}
-              `}
+              className={buttonClasses}
             >
-              <div>{slot.start} - {slot.end}</div>
+              <div className="font-semibold">{slot.start} - {slot.end}</div>
+              {slot.price && isAvailable && (
+                <div className="mt-1 text-[10px] font-medium">R{Number(slot.price).toFixed(0)}</div>
+              )}
               {slot.blocked && (
-                <div className="mt-1 text-[10px] text-error-600">Blocked</div>
+                <div className="mt-1 text-[10px] font-medium">🚫 Blocked</div>
               )}
               {!slot.blocked && !withinHours && (
-                <div className="mt-1 text-[10px] text-gray-500">Closed</div>
+                <div className="mt-1 text-[10px] font-medium">⏰ Closed</div>
               )}
               {!slot.blocked && withinHours && !slot.available && (
-                <div className="mt-1 text-[10px] text-gray-600">Booked</div>
+                <div className="mt-1 text-[10px] font-medium">📅 Booked</div>
               )}
               {withinHours && !baseUnavailable && !canStartHere && (
-                <div className="mt-1 text-[10px] text-gray-600">Too short</div>
+                <div className="mt-1 text-[10px] font-medium">⏱️ Too Short</div>
+              )}
+              {isAvailable && (
+                <div className="mt-1 text-[10px] font-medium text-green-600">✅ Available</div>
               )}
             </button>
           );
         })}
       </div>
       <div className="flex flex-wrap gap-4 text-xs text-gray-600">
-        <div className="flex items-center gap-1"><span className="w-3 h-3 bg-white border rounded" /> Available</div>
-        <div className="flex items-center gap-1"><span className="w-3 h-3 bg-gray-300 rounded" /> Booked</div>
-        <div className="flex items-center gap-1"><span className="w-3 h-3 bg-gray-200 rounded" /> Closed / Unavailable</div>
-        <div className="flex items-center gap-1"><span className="w-3 h-3 bg-primary-600 rounded" /> Selected Start</div>
+        <div className="flex items-center gap-1">
+          <span className="w-3 h-3 bg-green-50 border border-green-200 rounded" /> 
+          <span>✅ Available</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="w-3 h-3 bg-red-50 border border-red-200 rounded" /> 
+          <span>📅 Booked</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="w-3 h-3 bg-orange-50 border border-orange-200 rounded" /> 
+          <span>🚫 Blocked</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="w-3 h-3 bg-gray-50 border border-gray-200 rounded" /> 
+          <span>⏰ Closed</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="w-3 h-3 bg-primary-50 border border-primary-600 rounded" /> 
+          <span>Selected</span>
+        </div>
       </div>
       <div className="text-xs text-gray-500 mt-2">
         <div>
