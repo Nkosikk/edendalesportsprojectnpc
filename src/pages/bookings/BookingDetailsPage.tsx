@@ -70,6 +70,13 @@ const BookingDetailsPage = () => {
   };
 
   const handleMarkAsPaid = async () => {
+    if (!booking) return;
+    
+    const confirmation = window.confirm(
+      `Mark this booking as paid for ${booking.booking_reference}? This action cannot be undone.`
+    );
+    if (!confirmation) return;
+
     try {
       setMarkingPaid(true);
       

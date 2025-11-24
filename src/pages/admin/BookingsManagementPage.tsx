@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { adminService } from '../../services/adminService';
 import { paymentService } from '../../services/paymentService';
 import { fieldService } from '../../services/fieldsService';
+import { bookingService } from '../../services/bookingService';
 import type { BookingDetails, AdminBookingFilters, UpdateBookingStatusRequest, SportsField } from '../../types';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
@@ -299,12 +300,21 @@ const BookingsManagementPage: React.FC = () => {
     }
     try {
       setStatusModal((prev) => ({ ...prev, submitting: true }));
-      await updateStatus(
-        statusModal.booking.id,
-        statusModal.status,
-        statusModal.reason,
-        refundValue
-      );
+      
+      if (statusModal.status === 'cancelled') {
+        // Use bookingService.cancelBooking for proper cancellation
+        await bookingService.cancelBooking(statusModal.booking.id, statusModal.reason);
+        toast.success('Booking cancelled successfully');
+        load(); // Refresh the list
+      } else {
+        // For other status updates, use the adminService
+        await updateStatus(
+          statusModal.booking.id,
+          statusModal.status,
+          statusModal.reason,
+          refundValue
+        );
+      }
       closeStatusModal();
     } catch (error) {
       console.error('Status update failed', error);
