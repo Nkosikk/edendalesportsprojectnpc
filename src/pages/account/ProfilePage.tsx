@@ -12,14 +12,9 @@ const ProfilePage: React.FC = () => {
   });
 
   const deriveAccountStatus = () => {
-    const statusValue = user?.is_active ?? user?.status ?? user?.account_status ?? user?.isActive ?? user?.active;
+    const statusValue = user?.is_active;
     if (typeof statusValue === 'boolean') {
       return statusValue ? 'Active' : 'Inactive';
-    }
-    if (typeof statusValue === 'string') {
-      const normalized = statusValue.toLowerCase();
-      if (['active', 'enabled', '1', 'true', 'yes'].includes(normalized)) return 'Active';
-      if (['inactive', 'disabled', '0', 'false', 'no'].includes(normalized)) return 'Inactive';
     }
     return 'Active';
   };

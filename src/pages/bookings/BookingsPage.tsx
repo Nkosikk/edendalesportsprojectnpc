@@ -243,7 +243,7 @@ const BookingsPage = () => {
             {(visibleBookings || []).map((booking) => {
               const adjustedAmount = getRefundAdjustedAmount(booking);
               const refundDue = getExplicitRefundAmount(booking);
-              const showCancelAction = (booking.status === 'pending' || booking.status === 'confirmed') && booking.status !== 'cancelled';
+              const showCancelAction = booking.status === 'pending' || booking.status === 'confirmed';
               const canCancel = canUserCancelBooking(booking, user?.role);
               const cancelRestriction = getCancellationRestrictionMessage(booking, user?.role);
               return (
