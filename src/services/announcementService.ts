@@ -50,6 +50,35 @@ const fetchCandidates = [
   '/public/announcements',
   '/public/announcement',
 ];
+const listCandidates = [
+  '/announcements?all=1',
+  '/announcements',
+  '/announcement/all',
+  '/announcement',
+  '/admin/announcements',
+  '/public/announcements',
+  '/public/announcement',
+];
+
+const applyFilters = (
+  announcements: Announcement[],
+  filters?: {
+    is_active?: boolean;
+    type?: Announcement['type'];
+    target_audience?: Announcement['target_audience'];
+  }
+) => {
+  if (!filters) return announcements;
+  return announcements.filter((item) => {
+    if (filters.is_active !== undefined) {
+      const active = item.is_active ?? item.active ?? false;
+      if (filters.is_active !== active) return false;
+    }
+    if (filters.type && item.type !== filters.type) return false;
+    if (filters.target_audience && item.target_audience !== filters.target_audience) return false;
+    return true;
+  });
+};
 
 const handleResponse = async (promise: Promise<any>) => {
   const response = await promise;
@@ -179,14 +208,48 @@ export const announcementService = {
       );
 
       const announcements = Array.isArray(data) ? data : data?.data ?? [];
-      return announcements.map(normalizeAnnouncement);
+      const normalized = announcements.map(normalizeAnnouncement);
+      if (normalized.length > 0) {
+        return normalized;
+      }
     } catch (error: any) {
       if (error?.response?.status === 401) {
         throw error;
       }
-      console.warn('announcementService.fetchAll failed:', error);
-      return [];
+      console.warn('announcementService.fetchAll primary endpoint failed:', error);
     }
+
+    for (const path of listCandidates) {
+      try {
+        const payload = await handleResponse(
+          apiClient.get(path, {
+            headers: silentErrorHeaders,
+          })
+        );
+
+        const rawList = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.data)
+          ? payload.data
+          : payload
+          ? [payload]
+          : [];
+
+        if (rawList.length === 0) {
+          continue;
+        }
+
+        const normalized = rawList.map(normalizeAnnouncement);
+        const filtered = applyFilters(normalized, filters);
+        if (filtered.length > 0) {
+          return filtered;
+        }
+      } catch (fallbackError) {
+        console.warn(`announcementService.fetchAll fallback failed for ${path}:`, fallbackError);
+      }
+    }
+
+    return [];
   },
 
   async fetchVisible(): Promise<Announcement[]> {
