@@ -21,10 +21,32 @@ export interface User {
 }
 
 export interface Announcement {
+  id?: number;
+  title: string;
   message: string;
-  active: boolean;
+  type: 'info' | 'warning' | 'urgent' | 'maintenance';
+  target_audience: 'all' | 'customers' | 'staff';
+  is_active: boolean;
+  start_date?: string | null;
+  end_date?: string | null;
+  created_by?: number;
+  created_by_name?: string;
+  created_by_email?: string;
+  created_at?: string;
   updated_at?: string;
+  // Legacy fields for backward compatibility
+  active?: boolean;
   updatedAt?: string;
+}
+
+export interface AnnouncementInput {
+  title: string;
+  message: string;
+  type?: 'info' | 'warning' | 'urgent' | 'maintenance';
+  target_audience?: 'all' | 'customers' | 'staff';
+  is_active?: boolean;
+  start_date?: string | null;
+  end_date?: string | null;
 }
 
 export interface SportsField {

@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { Calendar, MapPin, Clock, Star, ShieldAlert } from 'lucide-react';
 import Button from '../components/ui/Button';
+import PublicAnnouncements from '../components/ui/PublicAnnouncements';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { fieldService } from '../services/fieldsService';
@@ -101,6 +102,14 @@ const HomePage = () => {
               Premium sports facilities at Edendale Sports Projects NPC. From football pitches to rugby fields.
             </p>
           </div>
+        </div>
+      </section>
+
+      {/* Announcements Section */}
+      <section className="py-3 bg-white border-t">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-base font-semibold text-gray-900 mb-2">Announcements</h2>
+          <PublicAnnouncements />
         </div>
       </section>
 

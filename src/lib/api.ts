@@ -2,8 +2,10 @@ import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import toast from 'react-hot-toast';
 
 // API Configuration
-// Use the real backend URL directly (supports CORS)
-const API_BASE_URL = 'https://www.ndosiautomation.co.za/EDENDALESPORTSPROJECTNPC/api';
+// Use Vite proxy in development, direct URL in production
+const API_BASE_URL = import.meta.env.DEV 
+  ? '/api'  // Use Vite proxy in development
+  : 'https://www.ndosiautomation.co.za/EDENDALESPORTSPROJECTNPC/api'; // Direct URL in production
 
 // Create axios instance
 export const apiClient: AxiosInstance = axios.create({
@@ -52,9 +54,17 @@ apiClient.interceptors.response.use(
 
     // Handle 401 errors (unauthorized) - but do NOT redirect for login/register failures
     if (error.response?.status === 401 && !originalRequest?._retry && !isAuthLoginOrRegister) {
+      const skipRedirectHeader =
+        originalRequest?.headers?.['X-Skip-401-Redirect'] ?? originalRequest?.headers?.['x-skip-401-redirect'];
+      const skipRedirect = Boolean(skipRedirectHeader);
       if (originalRequest) (originalRequest as any)._retry = true;
       localStorage.removeItem('accessToken');
       localStorage.removeItem('user');
+
+      if (skipRedirect) {
+        return Promise.reject(error);
+      }
+
       // Redirect to login for general 401s
       window.location.href = '/login';
       return Promise.reject(error);
