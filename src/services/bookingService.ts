@@ -237,4 +237,17 @@ export const bookingService = {
     })();
     return result;
   },
+
+  /**
+   * Mark a booking as complete (Admin only)
+   */
+  markBookingComplete: async (id: number): Promise<BookingDetails> => {
+    const response = await apiClient.put<ApiResponse<BookingDetails>>(`/bookings/${id}/complete`, {});
+    const result = handleApiResponse<BookingDetails>(response);
+    (async () => {
+      const { logAudit } = await import('../lib/audit');
+      logAudit({ action: 'complete_booking', entity: 'booking', entityId: id, metadata: { status: 'completed' } });
+    })();
+    return result;
+  },
 };

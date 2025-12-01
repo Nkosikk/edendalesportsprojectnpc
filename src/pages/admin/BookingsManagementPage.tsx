@@ -783,9 +783,17 @@ const BookingsManagementPage: React.FC = () => {
 
                             {row.status === 'confirmed' && (
                               <button
-                                onClick={() => {
-                                  updateStatus(row.id, 'completed');
+                                onClick={async () => {
                                   setOpenDropdown(null);
+                                  try {
+                                    toast.loading('Marking booking as complete...', { id: 'complete-booking' });
+                                    await bookingService.markBookingComplete(row.id);
+                                    toast.success('Booking marked as complete', { id: 'complete-booking' });
+                                    load(); // Refresh the bookings list
+                                  } catch (e: any) {
+                                    const msg = e?.response?.data?.message || e?.message || 'Failed to mark booking as complete';
+                                    toast.error(msg, { id: 'complete-booking' });
+                                  }
                                 }}
                                 className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-blue-600"
                               >
