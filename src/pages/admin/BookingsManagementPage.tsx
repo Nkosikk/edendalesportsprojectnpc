@@ -1185,6 +1185,7 @@ const BookingsManagementPage: React.FC = () => {
                     setRefundModal((prev) => ({ ...prev, submitting: true }));
                     await adminService.markBookingRefunded({
                       booking_id: refundModal.booking.id,
+                      payment_id: refundModal.booking.payment_id ?? undefined,
                       amount: amountValue,
                       reason: refundModal.reason || 'Refund processed',
                     });

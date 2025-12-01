@@ -80,6 +80,7 @@ export interface BookingDetails {
   duration_hours: number;
   hourly_rate: number;
   total_amount: number;
+  payment_id?: number | null;
   status: 'pending' | 'confirmed' | 'cancelled' | 'completed';
   payment_status: 'pending' | 'paid' | 'refunded' | 'failed' | 'manual_pending';
   payment_method?: 'online' | 'eft' | 'cash' | 'card';

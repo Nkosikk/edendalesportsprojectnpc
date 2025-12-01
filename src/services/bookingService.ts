@@ -52,6 +52,16 @@ const normalizeBookingRecord = (row: any): BookingDetails => {
   normalized.status = normalizeBookingStatus(row);
   const id = pickNumber(row.id, row.booking_id, row.bookingId) ?? 0;
   normalized.id = Number(id);
+  const paymentId = pickNumber(
+    row.payment_id,
+    row.paymentId,
+    row.payment?.id,
+    row.payment?.payment_id,
+    row.payment?.paymentId,
+    row.payment_details?.id,
+    row.payment_details?.payment_id,
+  );
+  if (paymentId !== undefined) normalized.payment_id = Number(paymentId);
   const bookingRef = pickString(row.booking_reference, row.reference, row.booking_ref, row.ref) ?? '';
   normalized.booking_reference = bookingRef;
   const totalAmount = pickNumber(row.total_amount, row.amount, row.total, row.price) ?? 0;

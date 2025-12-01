@@ -17,6 +17,10 @@ import type {
  * Handles all administrative functions
  */
 
+const PAYMENT_API_BASE = import.meta.env.DEV
+  ? '/apipayments'
+  : 'https://www.ndosiautomation.co.za/EDENDALESPORTSPROJECTNPC/apipayments';
+
 export const adminService = {
   /**
    * Get dashboard data with statistics
@@ -209,6 +213,22 @@ export const adminService = {
     const normalized: any = { ...booking };
     normalized.id = Number(booking.id ?? booking.booking_id ?? booking.bookingId);
     normalized.booking_reference = String(booking.booking_reference ?? booking.reference ?? booking.booking_ref ?? booking.ref ?? '');
+    const paymentIdCandidates = [
+      booking.payment_id,
+      booking.paymentId,
+      booking.payment?.id,
+      booking.payment?.payment_id,
+      booking.payment?.paymentId,
+      booking.payment_details?.id,
+      booking.payment_details?.payment_id,
+    ];
+    for (const candidate of paymentIdCandidates) {
+      const num = Number(candidate);
+      if (Number.isFinite(num)) {
+        normalized.payment_id = num;
+        break;
+      }
+    }
     const amt = Number(booking.total_amount ?? booking.amount ?? booking.total ?? booking.price);
     if (Number.isFinite(amt)) normalized.total_amount = amt;
     normalized.payment_status = normalizePaymentStatus(booking);
@@ -305,6 +325,22 @@ export const adminService = {
           // Normalize identifiers
           normalized.id = Number(b.id ?? b.booking_id ?? b.bookingId);
           normalized.booking_reference = String(b.booking_reference ?? b.reference ?? b.booking_ref ?? b.ref ?? '');
+          const paymentIdCandidates = [
+            b.payment_id,
+            b.paymentId,
+            b.payment?.id,
+            b.payment?.payment_id,
+            b.payment?.paymentId,
+            b.payment_details?.id,
+            b.payment_details?.payment_id,
+          ];
+          for (const candidate of paymentIdCandidates) {
+            const num = Number(candidate);
+            if (Number.isFinite(num)) {
+              normalized.payment_id = num;
+              break;
+            }
+          }
           // Normalize money/time fields defensively
           const amt = Number(b.total_amount ?? b.amount ?? b.total ?? b.price);
           if (Number.isFinite(amt)) normalized.total_amount = amt; 
@@ -407,10 +443,11 @@ export const adminService = {
    * Mark a booking refund as processed (set payment_status to refunded)
    */
   markBookingRefunded: async (
-    data: { booking_id: number; amount?: number; reason?: string }
+    data: { booking_id: number; payment_id?: number; amount?: number; reason?: string }
   ): Promise<BookingDetails | null> => {
     const payload: any = {
       booking_id: Number(data.booking_id),
+      payment_id: data.payment_id,
       amount: data.amount,
       refund_amount: data.amount,
       refundAmount: data.amount,
@@ -422,19 +459,76 @@ export const adminService = {
     payload.id = payload.booking_id;
     payload.bookingId = payload.booking_id;
 
-    const candidatePaths = [
-      `/admin/bookings/${payload.booking_id}/refund`,
-      `/admin/bookings/${payload.booking_id}/mark-refunded`,
-      '/admin/bookings/refund',
-      '/admin/bookings/mark-refunded',
-      '/admin/refunds',
-      '/payments/refund',
-    ];
+    const refundCompletionPayload: Record<string, any> = {
+      booking_id: payload.booking_id,
+    };
+    const paymentIdNumber = Number(data.payment_id);
+    if (Number.isFinite(paymentIdNumber) && paymentIdNumber > 0) {
+      refundCompletionPayload.payment_id = paymentIdNumber;
+    }
+    if (typeof data.amount === 'number') {
+      refundCompletionPayload.amount = data.amount;
+    }
+    if (data.reason) {
+      refundCompletionPayload.reason = data.reason;
+    }
+
+    type CandidateRequest = {
+      url: string;
+      method: 'put' | 'post';
+      data?: Record<string, any> | null;
+    };
+
+    const candidateRequests: CandidateRequest[] = [];
+
+    if (Number.isFinite(paymentIdNumber) && paymentIdNumber > 0) {
+      candidateRequests.push({
+        url: `${PAYMENT_API_BASE}/refunds/${paymentIdNumber}/complete`,
+        method: 'put',
+        data: refundCompletionPayload,
+      });
+    }
+
+    candidateRequests.push(
+      {
+        url: `/admin/bookings/${payload.booking_id}/refund`,
+        method: 'post',
+        data: payload,
+      },
+      {
+        url: `/admin/bookings/${payload.booking_id}/mark-refunded`,
+        method: 'post',
+        data: payload,
+      },
+      {
+        url: '/admin/bookings/refund',
+        method: 'post',
+        data: payload,
+      },
+      {
+        url: '/admin/bookings/mark-refunded',
+        method: 'post',
+        data: payload,
+      },
+      {
+        url: '/admin/refunds',
+        method: 'post',
+        data: payload,
+      },
+      {
+        url: '/payments/refund',
+        method: 'post',
+        data: payload,
+      }
+    );
 
     let lastError: any = null;
-    for (const path of candidatePaths) {
+    for (const requestConfig of candidateRequests) {
       try {
-        const response = await apiClient.post<ApiResponse<BookingDetails | any>>(path, payload, {
+        const response = await apiClient.request<ApiResponse<BookingDetails | any>>({
+          method: requestConfig.method,
+          url: requestConfig.url,
+          data: requestConfig.data ?? payload,
           headers: { 'X-Suppress-Error-Toast': '1' },
         });
 
