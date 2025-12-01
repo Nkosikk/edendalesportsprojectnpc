@@ -40,7 +40,6 @@ const normalizeAnnouncement = (payload: any): Announcement => {
 
 const silentErrorHeaders = {
   'X-Suppress-Error-Toast': '1',
-  'X-Skip-401-Redirect': '1',
 } as const;
 const fetchCandidates = [
   '/announcements?is_active=1',

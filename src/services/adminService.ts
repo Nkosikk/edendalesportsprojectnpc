@@ -17,10 +17,6 @@ import type {
  * Handles all administrative functions
  */
 
-const PAYMENT_API_BASE = import.meta.env.DEV
-  ? '/apipayments'
-  : 'https://www.ndosiautomation.co.za/EDENDALESPORTSPROJECTNPC/apipayments';
-
 export const adminService = {
   /**
    * Get dashboard data with statistics
@@ -447,7 +443,6 @@ export const adminService = {
   ): Promise<BookingDetails | null> => {
     const payload: any = {
       booking_id: Number(data.booking_id),
-      payment_id: data.payment_id,
       amount: data.amount,
       refund_amount: data.amount,
       refundAmount: data.amount,
@@ -458,6 +453,9 @@ export const adminService = {
     };
     payload.id = payload.booking_id;
     payload.bookingId = payload.booking_id;
+    if (typeof data.payment_id === 'number') {
+      payload.payment_id = data.payment_id;
+    }
 
     const refundCompletionPayload: Record<string, any> = {
       booking_id: payload.booking_id,
@@ -483,7 +481,7 @@ export const adminService = {
 
     if (Number.isFinite(paymentIdNumber) && paymentIdNumber > 0) {
       candidateRequests.push({
-        url: `${PAYMENT_API_BASE}/refunds/${paymentIdNumber}/complete`,
+        url: `/payments/refunds/${paymentIdNumber}/complete`,
         method: 'put',
         data: refundCompletionPayload,
       });
