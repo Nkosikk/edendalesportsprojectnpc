@@ -1,4 +1,5 @@
 import apiClient, { handleApiResponse } from '../lib/api';
+import { paymentService } from './paymentService';
 import type {
   DashboardData,
   User,
@@ -441,134 +442,64 @@ export const adminService = {
   markBookingRefunded: async (
     data: { booking_id: number; payment_id?: number; amount?: number; reason?: string }
   ): Promise<BookingDetails | null> => {
-    const payload: any = {
-      booking_id: Number(data.booking_id),
-      amount: data.amount,
-      refund_amount: data.amount,
-      refundAmount: data.amount,
-      reason: data.reason,
-      notes: data.reason,
-      action: 'refund',
-      status: 'refund',
-    };
-    payload.id = payload.booking_id;
-    payload.bookingId = payload.booking_id;
-    if (typeof data.payment_id === 'number') {
-      payload.payment_id = data.payment_id;
+    const bookingId = Number(data.booking_id);
+    if (!Number.isFinite(bookingId) || bookingId <= 0) {
+      throw new Error('A valid booking ID is required to mark a refund.');
     }
 
-    const refundCompletionPayload: Record<string, any> = {
-      booking_id: payload.booking_id,
-    };
-    const paymentIdNumber = Number(data.payment_id);
-    if (Number.isFinite(paymentIdNumber) && paymentIdNumber > 0) {
-      refundCompletionPayload.payment_id = paymentIdNumber;
-    }
-    if (typeof data.amount === 'number') {
-      refundCompletionPayload.amount = data.amount;
-    }
-    if (data.reason) {
-      refundCompletionPayload.reason = data.reason;
-    }
-
-    type CandidateRequest = {
-      url: string;
-      method: 'put' | 'post';
-      data?: Record<string, any> | null;
-    };
-
-    const candidateRequests: CandidateRequest[] = [];
-
-    if (Number.isFinite(paymentIdNumber) && paymentIdNumber > 0) {
-      candidateRequests.push({
-        url: `/payments/refunds/${paymentIdNumber}/complete`,
-        method: 'put',
-        data: refundCompletionPayload,
-      });
-    }
-
-    candidateRequests.push(
-      {
-        url: `/admin/bookings/${payload.booking_id}/refund`,
-        method: 'post',
-        data: payload,
-      },
-      {
-        url: `/admin/bookings/${payload.booking_id}/mark-refunded`,
-        method: 'post',
-        data: payload,
-      },
-      {
-        url: '/admin/bookings/refund',
-        method: 'post',
-        data: payload,
-      },
-      {
-        url: '/admin/bookings/mark-refunded',
-        method: 'post',
-        data: payload,
-      },
-      {
-        url: '/admin/refunds',
-        method: 'post',
-        data: payload,
-      },
-      {
-        url: '/payments/refund',
-        method: 'post',
-        data: payload,
-      }
-    );
-
-    let lastError: any = null;
-    for (const requestConfig of candidateRequests) {
+    let paymentIdNumber = Number(data.payment_id);
+    if (!Number.isFinite(paymentIdNumber) || paymentIdNumber <= 0) {
       try {
-        const response = await apiClient.request<ApiResponse<BookingDetails | any>>({
-          method: requestConfig.method,
-          url: requestConfig.url,
-          data: requestConfig.data ?? payload,
-          headers: { 'X-Suppress-Error-Toast': '1' },
-        });
-
-        const raw = response?.data as any;
-        if (typeof raw?.success === 'boolean') {
-          if (!raw.success) throw new Error(raw?.message || 'Refund failed');
-          const bookingData = raw?.data ?? raw?.booking ?? null;
-          if (bookingData) {
-            (async () => {
-              const { logAudit } = await import('../lib/audit');
-              logAudit({
-                action: 'mark_refund',
-                entity: 'booking',
-                entityId: payload.booking_id,
-                metadata: { amount: data.amount, reason: data.reason },
-              });
-            })();
-            return bookingData as BookingDetails;
-          }
-          return null;
-        }
-
-        if (response.status >= 200 && response.status < 300) {
-          (async () => {
-            const { logAudit } = await import('../lib/audit');
-            logAudit({
-              action: 'mark_refund',
-              entity: 'booking',
-              entityId: payload.booking_id,
-              metadata: { amount: data.amount, reason: data.reason },
-            });
-          })();
-          return (raw?.data ?? raw?.booking ?? raw ?? null) as BookingDetails | null;
+        const paymentStatus = await paymentService.getPaymentStatus(undefined, bookingId);
+        const statusPaymentId = Number(paymentStatus?.payment?.id ?? paymentStatus?.payment_id);
+        if (Number.isFinite(statusPaymentId) && statusPaymentId > 0) {
+          paymentIdNumber = statusPaymentId;
         }
       } catch (error) {
-        lastError = error;
-        continue;
+        console.warn('adminService.markBookingRefunded: Unable to fetch payment status for booking', bookingId, error);
       }
     }
 
-    const message = lastError?.response?.data?.message || lastError?.message || 'Failed to mark booking as refunded';
-    throw new Error(message);
+    if (!Number.isFinite(paymentIdNumber) || paymentIdNumber <= 0) {
+      throw new Error('Unable to determine the payment ID for this booking. Please verify the payment record before marking as refunded.');
+    }
+
+    const requestBody: Record<string, any> = {
+      booking_id: bookingId,
+      payment_id: paymentIdNumber,
+    };
+    if (typeof data.amount === 'number') {
+      requestBody.amount = data.amount;
+      requestBody.refund_amount = data.amount;
+    }
+    if (data.reason) {
+      requestBody.reason = data.reason;
+      requestBody.notes = data.reason;
+    }
+
+    const response = await apiClient.put<ApiResponse<BookingDetails | any>>(
+      `/payments/refunds/${paymentIdNumber}/complete`,
+      requestBody,
+      { headers: { 'X-Suppress-Error-Toast': '1' } }
+    );
+
+    const raw = response?.data as any;
+    if (typeof raw?.success === 'boolean' && !raw.success) {
+      throw new Error(raw?.message || 'Failed to mark booking as refunded');
+    }
+
+    (async () => {
+      const { logAudit } = await import('../lib/audit');
+      logAudit({
+        action: 'mark_refund',
+        entity: 'booking',
+        entityId: bookingId,
+        metadata: { amount: data.amount, reason: data.reason, payment_id: paymentIdNumber },
+      });
+    })();
+
+    const bookingData = raw?.data ?? raw?.booking ?? null;
+    return bookingData ? (bookingData as BookingDetails) : null;
   },
 };
 
