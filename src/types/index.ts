@@ -109,6 +109,7 @@ export interface PaymentResponse {
 }
 
 export interface PaymentStatus {
+  payment_id?: number;
   payment: {
     id: number;
     payment_reference: string;
