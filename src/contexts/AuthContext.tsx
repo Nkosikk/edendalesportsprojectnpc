@@ -68,8 +68,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           password: credentials.password,
         },
         {
-          headers: { 'X-Suppress-Error-Toast': '1' },
-        }
+          suppressErrorToast: true,
+        } as any
       );
 
       if (!response.data.success) throw new Error('Login failed');

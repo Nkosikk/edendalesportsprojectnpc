@@ -370,8 +370,8 @@ export const adminService = {
    */
   blockSlot: async (data: BlockSlotRequest): Promise<void> => {
     const response = await apiClient.post<ApiResponse>('/admin/block-slot', data, {
-      headers: { 'X-Suppress-Error-Toast': '1' },
-    });
+      suppressErrorToast: true,
+    } as any);
     const result = handleApiResponse<void>(response);
     (async () => {
       const { logAudit } = await import('../lib/audit');
@@ -385,8 +385,8 @@ export const adminService = {
    */
   unblockSlot: async (data: BlockSlotRequest): Promise<void> => {
     const response = await apiClient.post<ApiResponse>('/admin/unblock-slot', data, {
-      headers: { 'X-Suppress-Error-Toast': '1' },
-    });
+      suppressErrorToast: true,
+    } as any);
     const result = handleApiResponse<void>(response);
     (async () => {
       const { logAudit } = await import('../lib/audit');
@@ -415,13 +415,13 @@ export const adminService = {
     let response: any;
     try {
       response = await apiClient.put<ApiResponse<BookingDetails>>('/admin/booking-status', payload, {
-        headers: { 'X-Suppress-Error-Toast': '1' },
-      });
+        suppressErrorToast: true,
+      } as any);
     } catch (err: any) {
       // Fallback to POST in case the endpoint expects it
       response = await apiClient.post<ApiResponse<BookingDetails>>('/admin/booking-status', payload, {
-        headers: { 'X-Suppress-Error-Toast': '1' },
-      });
+        suppressErrorToast: true,
+      } as any);
     }
     const result = handleApiResponse<BookingDetails>(response);
     (async () => {

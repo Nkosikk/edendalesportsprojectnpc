@@ -163,8 +163,8 @@ export const fieldService = {
    */
   activateField: async (id: number): Promise<SportsField> => {
     const response = await apiClient.put<ApiResponse<SportsField>>(`/fields/${id}/activate`, {}, {
-      headers: { 'X-Suppress-Error-Toast': '1' },
-    });
+      suppressErrorToast: true,
+    } as any);
     const activated = handleApiResponse<any>(response);
     return normalizeField(activated?.field || activated);
   },
@@ -174,8 +174,8 @@ export const fieldService = {
    */
   deactivateField: async (id: number): Promise<SportsField> => {
     const response = await apiClient.put<ApiResponse<SportsField>>(`/fields/${id}/deactivate`, {}, {
-      headers: { 'X-Suppress-Error-Toast': '1' },
-    });
+      suppressErrorToast: true,
+    } as any);
     const deactivated = handleApiResponse<any>(response);
     return normalizeField(deactivated?.field || deactivated);
   },

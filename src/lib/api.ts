@@ -84,7 +84,9 @@ apiClient.interceptors.response.use(
     // Handle other errors
     // Only show error toast if not a handled success (status not 2xx or success false)
     // Allow callers to suppress error toasts explicitly
-    const suppressToast = originalRequest?.headers?.['X-Suppress-Error-Toast'];
+    const suppressToastHeader = originalRequest?.headers?.['X-Suppress-Error-Toast'] ?? originalRequest?.headers?.['x-suppress-error-toast'];
+    const suppressToastFlag = (originalRequest as any)?.suppressErrorToast;
+    const suppressToast = Boolean(suppressToastHeader ?? suppressToastFlag);
     const isSuccess = error.response?.data?.success;
     const status = error.response?.status;
     const message = error.response?.data?.message;
