@@ -317,6 +317,9 @@ export interface UpdateBookingRequest {
   durationHours?: number;
   field_id?: number;
   fieldId?: number;
+  id?: number;
+  booking_id?: number;
+  bookingId?: number;
 }
 
 export interface CreateFieldRequest {

@@ -108,6 +108,7 @@ const ModifyBookingPage = () => {
         end_time: endTime,
         duration_hours: duration,
         field_id: booking.field_id,
+        booking_id: bookingId,
         notes: notes || undefined,
       });
     },

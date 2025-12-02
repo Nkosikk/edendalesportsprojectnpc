@@ -133,6 +133,16 @@ const buildBookingPayload = (data: BookingPayloadSource, { includeFieldId }: { i
     }
   }
 
+  const bookingIdCandidate = data.id ?? data.booking_id ?? (data as any).bookingId;
+  if (bookingIdCandidate !== undefined) {
+    const bookingId = Number(bookingIdCandidate);
+    if (Number.isFinite(bookingId)) {
+      payload.booking_id = bookingId;
+      payload.bookingId = bookingId;
+      payload.id = bookingId;
+    }
+  }
+
   if (data.booking_date) {
     payload.booking_date = data.booking_date;
     payload.bookingDate = data.booking_date;
