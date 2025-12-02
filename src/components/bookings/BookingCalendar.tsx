@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from 'react-query';
 import { fieldService } from '../../services/fieldsService';
 import LoadingSpinner from '../ui/LoadingSpinner';
-import { mergeAvailability, AvailabilityMergedSlot, computeBookingCost, getOperatingHours, isWeekend, isPublicHoliday, generateHourlySlots } from '../../utils/scheduling';
+import { mergeAvailability, AvailabilityMergedSlot, computeBookingCost, getOperatingHours, isWeekend, isPublicHoliday, generateHourlySlots, normalizeTimeHM } from '../../utils/scheduling';
 import Button from '../ui/Button';
 import toast from 'react-hot-toast';
 
@@ -16,8 +16,13 @@ interface BookingCalendarProps {
 }
 
 const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialStartTime, onSelect }: BookingCalendarProps) => {
+  const normalizedInitialStart = useMemo(() => {
+    if (!initialStartTime) return null;
+    const normalized = normalizeTimeHM(initialStartTime);
+    return normalized || null;
+  }, [initialStartTime]);
   const [mergedSlots, setMergedSlots] = useState<AvailabilityMergedSlot[]>([]);
-  const [selectedStart, setSelectedStart] = useState<string | null>(initialStartTime || null);
+  const [selectedStart, setSelectedStart] = useState<string | null>(null);
 
   const toLocalYMD = (d: Date) => {
     const y = d.getFullYear();
@@ -66,8 +71,8 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialS
   );
 
   useEffect(() => {
-    setSelectedStart(initialStartTime || null);
-  }, [fieldId, dateStr, durationHours, initialStartTime]);
+    setSelectedStart(null);
+  }, [fieldId, dateStr, durationHours, normalizedInitialStart]);
 
   useEffect(() => {
     setMergedSlots(mergeAvailability(date, data));
@@ -75,11 +80,11 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialS
 
   // Auto-select initial time when slots are loaded
   useEffect(() => {
-    if (initialStartTime && mergedSlots.length > 0 && !selectedStart) {
-      const startSlot = mergedSlots.find(slot => slot.start === initialStartTime);
+    if (normalizedInitialStart && mergedSlots.length > 0 && !selectedStart) {
+      const startSlot = mergedSlots.find(slot => slot.start === normalizedInitialStart);
       if (startSlot && startSlot.available && !startSlot.blocked) {
         // Check if we can select the full duration from this start time
-        const startIndex = mergedSlots.findIndex(s => s.start === initialStartTime);
+        const startIndex = mergedSlots.findIndex(s => s.start === normalizedInitialStart);
         let canSelect = true;
         for (let i = 0; i < durationHours && canSelect; i++) {
           const slot = mergedSlots[startIndex + i];
@@ -88,11 +93,11 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialS
           }
         }
         if (canSelect) {
-          handleSelect(initialStartTime);
+          handleSelect(normalizedInitialStart);
         }
       }
     }
-  }, [initialStartTime, mergedSlots, selectedStart, durationHours]);
+  }, [normalizedInitialStart, mergedSlots, selectedStart, durationHours]);
 
   const hourlyRate = hourlyRateOverride || data?.field?.hourly_rate || 400;
 

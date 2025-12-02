@@ -10,6 +10,24 @@ import { useState, useEffect } from 'react';
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { safeNumber } from '../../lib/utils';
+import { normalizeTimeHM } from '../../utils/scheduling';
+
+const parseDateFromISO = (isoDate: string): Date => {
+  const [year, month, day] = isoDate.split('-').map(Number);
+  return new Date(year, (month || 1) - 1, day || 1);
+};
+
+const toLocalDateInputValue = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const startOfToday = () => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+};
 
 const ModifyBookingPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -17,7 +35,7 @@ const ModifyBookingPage = () => {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const { user } = useAuth();
-  const [date, setDate] = useState<Date>(new Date());
+  const [date, setDate] = useState<Date>(startOfToday());
   const [duration, setDuration] = useState<number>(1);
   const [startTime, setStart] = useState<string | null>(null);
   const [endTime, setEnd] = useState<string | null>(null);
@@ -38,21 +56,24 @@ const ModifyBookingPage = () => {
   useEffect(() => {
     if (booking) {
       try {
-        setDate(new Date(booking.booking_date + 'T00:00:00'));
+        setDate(parseDateFromISO(booking.booking_date));
         setNotes(booking.notes || '');
         
         // Set initial time values from booking
         if (booking.start_time && booking.end_time) {
-          setStart(booking.start_time);
-          setEnd(booking.end_time);
-          const startHour = parseInt(booking.start_time.split(':')[0]);
-          const endHour = parseInt(booking.end_time.split(':')[0]);
+          const normalizedStart = normalizeTimeHM(booking.start_time);
+          const normalizedEnd = normalizeTimeHM(booking.end_time);
+          setStart(normalizedStart || booking.start_time);
+          setEnd(normalizedEnd || booking.end_time);
+          const startHour = parseInt((normalizedStart || booking.start_time).split(':')[0]);
+          const endHour = parseInt((normalizedEnd || booking.end_time).split(':')[0]);
           const originalDuration = endHour - startHour;
           setDuration(originalDuration > 0 ? originalDuration : booking.duration_hours || 1);
           
           // Calculate initial cost
-          const fieldHourlyRate = 400; // Default rate, will be updated by calendar
-          setCost(fieldHourlyRate * (originalDuration > 0 ? originalDuration : booking.duration_hours || 1));
+          const fieldHourlyRate = 400; // Default rate, will be synced when calendar loads
+          const hours = originalDuration > 0 ? originalDuration : booking.duration_hours || 1;
+          setCost(fieldHourlyRate * hours);
         } else {
           setDuration(booking.duration_hours || 1);
         }
@@ -66,8 +87,10 @@ const ModifyBookingPage = () => {
   // Track changes
   useEffect(() => {
     if (booking) {
-      const dateChanged = date.toISOString().split('T')[0] !== booking.booking_date;
-      const timeChanged = startTime !== booking.start_time || endTime !== booking.end_time;
+      const dateChanged = toLocalDateInputValue(date) !== booking.booking_date;
+      const normalizedStart = normalizeTimeHM(booking.start_time);
+      const normalizedEnd = normalizeTimeHM(booking.end_time);
+      const timeChanged = normalizeTimeHM(startTime) !== normalizedStart || normalizeTimeHM(endTime) !== normalizedEnd;
       const notesChanged = notes !== (booking.notes || '');
       setHasChanges(dateChanged || timeChanged || notesChanged);
     }
@@ -79,7 +102,7 @@ const ModifyBookingPage = () => {
       if (!hasChanges) throw new Error('No changes to save');
       
       return bookingService.updateBooking(bookingId, {
-        booking_date: date.toISOString().split('T')[0],
+        booking_date: toLocalDateInputValue(date),
         start_time: startTime,
         end_time: endTime,
         duration_hours: duration,
@@ -203,7 +226,16 @@ const ModifyBookingPage = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-4 rounded-lg border">
           <div className="flex flex-col">
             <label className="text-xs font-medium text-gray-700 mb-1">Date</label>
-            <input type="date" value={date.toISOString().split('T')[0]} onChange={e => setDate(new Date(e.target.value + 'T00:00:00'))} className="input text-sm" />
+            <input
+              type="date"
+              value={toLocalDateInputValue(date)}
+              onChange={e => {
+                if (e.target.value) {
+                  setDate(parseDateFromISO(e.target.value));
+                }
+              }}
+              className="input text-sm"
+            />
           </div>
           <div className="flex flex-col">
             <label className="text-xs font-medium text-gray-700 mb-1">Duration</label>
@@ -211,7 +243,20 @@ const ModifyBookingPage = () => {
               {[1,2,3,4].map(h => <option key={h} value={h}>{h}h</option>)}
             </select>
           </div>
-          <div className="flex items-end"><Button variant="outline" size="sm" onClick={() => { setDate(new Date()); setDuration(1); setStart(null); setEnd(null); }}>Reset</Button></div>
+          <div className="flex items-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setDate(startOfToday());
+                setDuration(1);
+                setStart(null);
+                setEnd(null);
+              }}
+            >
+              Reset
+            </Button>
+          </div>
         </div>
         <div className="bg-white p-4 rounded-lg border">
           {booking.field_id ? (
@@ -257,7 +302,7 @@ const ModifyBookingPage = () => {
               <h3 className="text-sm font-medium text-gray-500">NEW BOOKING</h3>
               <div className="text-sm space-y-1 text-gray-700">
                 <div><span className="font-medium">Field:</span> {booking.field_name}</div>
-                <div><span className="font-medium">Date:</span> {date.toISOString().split('T')[0]}</div>
+                <div><span className="font-medium">Date:</span> {toLocalDateInputValue(date)}</div>
                 <div><span className="font-medium">Time:</span> {startTime || '—'} {endTime ? `- ${endTime}` : ''}</div>
                 <div><span className="font-medium">Duration:</span> {duration}h</div>
                 <div><span className="font-medium">Estimated Cost:</span> {startTime ? `R${safeNumber(cost).toFixed(2)}` : '—'}</div>
