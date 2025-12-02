@@ -71,6 +71,10 @@ const BookingDetailsPage = () => {
 
   const handleMarkAsPaid = async () => {
     if (!booking) return;
+    if (booking.status === 'cancelled') {
+      toast.error('Cannot process payment for cancelled booking');
+      return;
+    }
     
     const confirmation = window.confirm(
       `Mark this booking as paid for ${booking.booking_reference}? This action cannot be undone.`
@@ -220,7 +224,7 @@ const BookingDetailsPage = () => {
             {showPay && user?.role === 'customer' && (
               <PayButton bookingId={booking.id} label="Pay Now" />
             )}
-            {user?.role === 'admin' && booking.payment_status === 'pending' && (
+            {user?.role === 'admin' && booking.payment_status === 'pending' && booking.status !== 'cancelled' && (
               <Button 
                 status="paid"
                 onClick={handleMarkAsPaid}
