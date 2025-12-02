@@ -15,8 +15,8 @@ const AdminDashboardPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [dateRange, setDateRange] = useState({
-    from: format(new Date(new Date().getFullYear(), new Date().getMonth(), 1), 'yyyy-MM-dd'),
-    to: format(new Date(), 'yyyy-MM-dd'),
+    from: '',
+    to: '',
   });
 
   useEffect(() => {
@@ -26,7 +26,9 @@ const AdminDashboardPage: React.FC = () => {
   const fetchDashboard = async () => {
     try {
       setLoading(true);
-      const data = await adminService.getDashboard(dateRange.from, dateRange.to);
+      const fromParam = dateRange.from || undefined;
+      const toParam = dateRange.to || undefined;
+      const data = await adminService.getDashboard(fromParam, toParam);
       setDashboard(data);
     } catch (error) {
       toast.error('Failed to load dashboard data');

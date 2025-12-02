@@ -66,6 +66,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         {
           email: credentials.email,
           password: credentials.password,
+        },
+        {
+          headers: { 'X-Suppress-Error-Toast': '1' },
         }
       );
 

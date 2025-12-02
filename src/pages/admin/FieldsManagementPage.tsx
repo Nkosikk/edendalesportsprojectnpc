@@ -71,14 +71,13 @@ const FieldsManagementPage: React.FC = () => {
       }
       // Refresh from server (with cache-busting inside service)
       load();
-    } catch {
+    } catch (error: any) {
       // Revert optimistic update on error
       setFields(prev => prev.map(f => f.id === field.id ? { ...f, is_active: field.is_active } as SportsField : f));
-      toast.error('Failed to update field status');
+      const message = error?.response?.data?.message || error?.message || 'Failed to update field status';
+      toast.error(message);
     }
   };
-
-  const handleEdit = (field: SportsField) => setEditing(field);
 
   const validateBlockTime = (startTime: string, endTime: string, date: string): string | null => {
     // Parse time strings
@@ -142,6 +141,7 @@ const FieldsManagementPage: React.FC = () => {
       console.debug('POST /admin/block-slot', payload);
       await adminService.blockSlot(payload);
       toast.success('Slot blocked');
+      load();
     } catch (e: any) {
       console.error('Block slot failed', e);
       toast.error(e?.response?.data?.message || e?.message || 'Failed to block slot');
@@ -167,6 +167,7 @@ const FieldsManagementPage: React.FC = () => {
       console.debug('POST /admin/unblock-slot', payload);
       await adminService.unblockSlot(payload);
       toast.success('Slot unblocked');
+      load();
     } catch (e: any) {
       console.error('Unblock slot failed', e);
       toast.error(e?.response?.data?.message || e?.message || 'Failed to unblock slot');
@@ -288,7 +289,6 @@ const FieldsManagementPage: React.FC = () => {
                       <Button size="sm" variant="outline" onClick={() => toggleActive(row)}>
                         {row.is_active ? 'Deactivate' : 'Activate'}
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleEdit(row)}>Edit</Button>
                     </div>
                   )
                 }

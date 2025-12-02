@@ -23,11 +23,11 @@ export const adminService = {
    * Get dashboard data with statistics
    */
   getDashboard: async (fromDate?: string, toDate?: string): Promise<DashboardData> => {
+    const params: Record<string, string> = {};
+    if (fromDate) params.from_date = fromDate;
+    if (toDate) params.to_date = toDate;
     const response = await apiClient.get<ApiResponse<any>>('/admin/dashboard', {
-      params: {
-        from_date: fromDate,
-        to_date: toDate,
-      },
+      params,
     });
     const raw = handleApiResponse<any>(response);
 
@@ -369,7 +369,9 @@ export const adminService = {
    * Block a time slot for maintenance/events
    */
   blockSlot: async (data: BlockSlotRequest): Promise<void> => {
-    const response = await apiClient.post<ApiResponse>('/admin/block-slot', data);
+    const response = await apiClient.post<ApiResponse>('/admin/block-slot', data, {
+      headers: { 'X-Suppress-Error-Toast': '1' },
+    });
     const result = handleApiResponse<void>(response);
     (async () => {
       const { logAudit } = await import('../lib/audit');
@@ -382,7 +384,9 @@ export const adminService = {
    * Unblock a previously blocked time slot
    */
   unblockSlot: async (data: BlockSlotRequest): Promise<void> => {
-    const response = await apiClient.post<ApiResponse>('/admin/unblock-slot', data);
+    const response = await apiClient.post<ApiResponse>('/admin/unblock-slot', data, {
+      headers: { 'X-Suppress-Error-Toast': '1' },
+    });
     const result = handleApiResponse<void>(response);
     (async () => {
       const { logAudit } = await import('../lib/audit');
