@@ -41,12 +41,18 @@ const ModifyBookingPage = () => {
         setDate(new Date(booking.booking_date + 'T00:00:00'));
         setNotes(booking.notes || '');
         
-        // Calculate original duration and set initial values
+        // Set initial time values from booking
         if (booking.start_time && booking.end_time) {
+          setStart(booking.start_time);
+          setEnd(booking.end_time);
           const startHour = parseInt(booking.start_time.split(':')[0]);
           const endHour = parseInt(booking.end_time.split(':')[0]);
           const originalDuration = endHour - startHour;
           setDuration(originalDuration > 0 ? originalDuration : booking.duration_hours || 1);
+          
+          // Calculate initial cost
+          const fieldHourlyRate = 400; // Default rate, will be updated by calendar
+          setCost(fieldHourlyRate * (originalDuration > 0 ? originalDuration : booking.duration_hours || 1));
         } else {
           setDuration(booking.duration_hours || 1);
         }
@@ -212,7 +218,8 @@ const ModifyBookingPage = () => {
             <BookingCalendar 
               fieldId={booking.field_id} 
               date={date} 
-              duration={duration} 
+              duration={duration}
+              initialStartTime={booking.start_time}
               onSelect={handleSelect}
             />
           ) : (

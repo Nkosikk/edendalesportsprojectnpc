@@ -11,12 +11,13 @@ interface BookingCalendarProps {
   date: Date;
   duration: number; // hours
   hourlyRateOverride?: number;
+  initialStartTime?: string; // Pre-select this time slot
   onSelect: (startTime: string, endTime: string, cost: number) => void;
 }
 
-const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect }: BookingCalendarProps) => {
+const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialStartTime, onSelect }: BookingCalendarProps) => {
   const [mergedSlots, setMergedSlots] = useState<AvailabilityMergedSlot[]>([]);
-  const [selectedStart, setSelectedStart] = useState<string | null>(null);
+  const [selectedStart, setSelectedStart] = useState<string | null>(initialStartTime || null);
 
   const toLocalYMD = (d: Date) => {
     const y = d.getFullYear();
@@ -65,12 +66,33 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, onSelect
   );
 
   useEffect(() => {
-    setSelectedStart(null);
-  }, [fieldId, dateStr, durationHours]);
+    setSelectedStart(initialStartTime || null);
+  }, [fieldId, dateStr, durationHours, initialStartTime]);
 
   useEffect(() => {
     setMergedSlots(mergeAvailability(date, data));
   }, [data, date]);
+
+  // Auto-select initial time when slots are loaded
+  useEffect(() => {
+    if (initialStartTime && mergedSlots.length > 0 && !selectedStart) {
+      const startSlot = mergedSlots.find(slot => slot.start === initialStartTime);
+      if (startSlot && startSlot.available && !startSlot.blocked) {
+        // Check if we can select the full duration from this start time
+        const startIndex = mergedSlots.findIndex(s => s.start === initialStartTime);
+        let canSelect = true;
+        for (let i = 0; i < durationHours && canSelect; i++) {
+          const slot = mergedSlots[startIndex + i];
+          if (!slot || !slot.available || slot.blocked) {
+            canSelect = false;
+          }
+        }
+        if (canSelect) {
+          handleSelect(initialStartTime);
+        }
+      }
+    }
+  }, [initialStartTime, mergedSlots, selectedStart, durationHours]);
 
   const hourlyRate = hourlyRateOverride || data?.field?.hourly_rate || 400;
 
