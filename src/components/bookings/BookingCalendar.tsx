@@ -75,7 +75,26 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialS
   }, [fieldId, dateStr, durationHours, normalizedInitialStart]);
 
   useEffect(() => {
-    setMergedSlots(mergeAvailability(date, data));
+    const merged = mergeAvailability(date, data);
+    const now = new Date();
+    const sameDay = date.toDateString() === now.toDateString();
+
+    if (!sameDay) {
+      setMergedSlots(merged);
+      return;
+    }
+
+    const adjusted = merged.map(slot => {
+      const [hourStr, minuteStr] = slot.start.split(':');
+      const slotStart = new Date(date);
+      slotStart.setHours(Number(hourStr) || 0, Number(minuteStr) || 0, 0, 0);
+      const inPast = slotStart <= now;
+      return inPast
+        ? { ...slot, available: false, past: true }
+        : { ...slot, past: false };
+    });
+
+    setMergedSlots(adjusted);
   }, [data, date]);
 
   // Auto-select initial time when slots are loaded
@@ -109,7 +128,7 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialS
     // Validate availability across the duration
     for (let i = 0; i < durationHours; i++) {
       const s = mergedSlots[startIndex + i];
-      if (!s || !s.available || s.blocked) {
+      if (!s || !s.available || s.blocked || s.past) {
         toast.dismiss('unavailable-range');
         toast.error('Selected range includes unavailable hours', { id: 'unavailable-range' });
         return;
@@ -164,18 +183,18 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialS
         {mergedSlots.map((slot, idx) => {
           const isSelected = selectedStart === slot.start;
           const withinHours = isWithinOperatingHours(slot.start);
-          const baseUnavailable = !slot.available || slot.blocked || !withinHours;
+          const baseUnavailable = !slot.available || slot.blocked || !withinHours || !!slot.past;
           const canStartHere = (() => {
             if (baseUnavailable) return false;
             for (let i = 0; i < durationHours; i++) {
               const s = mergedSlots[idx + i];
-              if (!s || !s.available || s.blocked || !isWithinOperatingHours(s.start)) return false;
+              if (!s || !s.available || s.blocked || s.past || !isWithinOperatingHours(s.start)) return false;
             }
             return true;
           })();
           const disabled = baseUnavailable || !canStartHere;
-          const isBooked = !slot.available && !slot.blocked && withinHours;
-          const isAvailable = !disabled && withinHours && slot.available && !slot.blocked;
+          const isBooked = !slot.available && !slot.blocked && withinHours && !slot.past;
+          const isAvailable = !disabled && withinHours && slot.available && !slot.blocked && !slot.past;
           const title = !withinHours 
             ? 'Outside operating hours'
             : !baseUnavailable && !canStartHere
@@ -193,6 +212,8 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialS
             buttonClasses += 'border-red-200 bg-red-50 text-red-600 cursor-not-allowed ';
           } else if (slot.blocked) {
             buttonClasses += 'border-orange-200 bg-orange-50 text-orange-600 cursor-not-allowed ';
+          } else if (slot.past) {
+            buttonClasses += 'border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed ';
           } else {
             buttonClasses += 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed ';
           }
@@ -211,6 +232,9 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialS
               )}
               {slot.blocked && (
                 <div className="mt-1 text-[10px] font-medium">🚫 Blocked</div>
+              )}
+              {!slot.blocked && slot.past && (
+                <div className="mt-1 text-[10px] font-medium">⏳ Past</div>
               )}
               {!slot.blocked && !withinHours && (
                 <div className="mt-1 text-[10px] font-medium">⏰ Closed</div>

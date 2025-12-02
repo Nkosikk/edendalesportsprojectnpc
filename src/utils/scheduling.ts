@@ -92,6 +92,7 @@ export interface AvailabilityMergedSlot extends HourSlot {
   blocked?: boolean;
   blockReason?: string;
   price?: number;
+  past?: boolean;
 }
 
 interface FieldAvailabilityLike {
