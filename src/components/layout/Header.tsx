@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, User, LogOut, Settings, Calendar, Home, Users, Building, BarChart3, FileText, Megaphone } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -9,6 +9,8 @@ const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const adminMenuRef = useRef<HTMLDivElement | null>(null);
+  const profileMenuRef = useRef<HTMLDivElement | null>(null);
   const { user, logout, isAuthenticated } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -33,6 +35,29 @@ const Header = () => {
     { name: 'Analytics', href: '/admin/reports/analytics', icon: BarChart3 },
     { name: 'Communication', href: '/admin/communication', icon: Megaphone },
   ];
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        adminMenuRef.current &&
+        !adminMenuRef.current.contains(target)
+      ) {
+        setIsAdminOpen(false);
+      }
+      if (
+        profileMenuRef.current &&
+        !profileMenuRef.current.contains(target)
+      ) {
+        setIsProfileOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-200">
@@ -85,7 +110,7 @@ const Header = () => {
               </Link>
             ))}
             {user?.role === 'admin' && (
-              <div className="relative">
+              <div className="relative" ref={adminMenuRef}>
                 <button
                   onClick={() => {
                     setIsProfileOpen(false);
@@ -124,7 +149,7 @@ const Header = () => {
           {/* Desktop Auth */}
           <div className="hidden md:flex items-center space-x-4">
             {isAuthenticated ? (
-              <div className="relative">
+              <div className="relative" ref={profileMenuRef}>
                 <button
                   onClick={() => {
                     setIsAdminOpen(false);
