@@ -477,10 +477,17 @@ export const adminService = {
       requestBody.notes = data.reason;
     }
 
+    const token = localStorage.getItem('accessToken');
     const response = await apiClient.put<ApiResponse<BookingDetails | any>>(
       `/payments/refunds/${paymentIdNumber}/complete`,
       requestBody,
-      { headers: { 'X-Suppress-Error-Toast': '1' } }
+      token
+        ? {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        : undefined
     );
 
     const raw = response?.data as any;

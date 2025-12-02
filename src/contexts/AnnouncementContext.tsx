@@ -57,7 +57,7 @@ const normalizeAnnouncement = (payload?: Partial<SiteAnnouncement & Announcement
 
 export const AnnouncementProvider = ({ children }: { children: ReactNode }) => {
   const { user } = useAuth();
-  const userRole = user?.role as UserRole | undefined;
+  const userRole = useMemo(() => user?.role as UserRole | undefined, [user?.role]);
   const [announcement, setAnnouncement] = useState<SiteAnnouncement>(() => {
     if (typeof window === 'undefined') return defaultAnnouncement;
     try {
@@ -102,7 +102,18 @@ export const AnnouncementProvider = ({ children }: { children: ReactNode }) => {
     [persist]
   );
 
+  // Track last successful/attempted fetch to prevent rapid loops on auth failure/HMR
+  const lastFetchRef = useRef<number>(0);
+  const authFailureRef = useRef<boolean>(false);
+
   const refreshAnnouncement = useCallback(async () => {
+    const now = Date.now();
+    // If we recently fetched (< 5s), skip to avoid rapid loops caused by HMR re-mounts
+    if (now - lastFetchRef.current < 5000) {
+      return announcementRef.current;
+    }
+    lastFetchRef.current = now;
+
     let token = localStorage.getItem('accessToken');
 
     const applyFromRemote = (remote?: Announcement | null): SiteAnnouncement => {
@@ -129,7 +140,8 @@ export const AnnouncementProvider = ({ children }: { children: ReactNode }) => {
 
     let latest: Announcement | null = null;
 
-    if (token) {
+    // Only try authenticated calls if we have a valid token and we are not in an auth failure cooldown
+    if (token && token.trim().length > 0 && !authFailureRef.current) {
       try {
         const requiresAdminScope = userRole === UserRole.Admin || userRole === UserRole.Staff;
         const activeAnnouncements = requiresAdminScope
@@ -141,10 +153,12 @@ export const AnnouncementProvider = ({ children }: { children: ReactNode }) => {
           )[0];
         }
       } catch (error: any) {
-        if (error?.response?.status === 401) {
+        const status = error?.response?.status;
+        if (status === 401 || status === 403) {
           console.log('Announcement token rejected – clearing session and falling back to public feed');
           localStorage.removeItem('accessToken');
           token = null;
+          authFailureRef.current = true; // enter cooldown mode until next valid auth
         } else {
           console.warn('Failed to fetch authenticated announcements:', error);
         }
@@ -167,13 +181,23 @@ export const AnnouncementProvider = ({ children }: { children: ReactNode }) => {
     return applyFromRemote(null);
   }, [applyAnnouncement, userRole]);
 
+  // Reset auth failure cooldown when user changes (e.g., logs in again)
   useEffect(() => {
+    authFailureRef.current = false;
+  }, [userRole]);
+
+  // Stable polling effect – does not depend on refreshAnnouncement identity to avoid rapid re-runs
+  useEffect(() => {
+    // Initial fetch (will auto-throttle if HMR spam occurs)
     refreshAnnouncement();
     const interval = window.setInterval(() => {
-      refreshAnnouncement();
+      const hasToken = Boolean(localStorage.getItem('accessToken')?.trim());
+      if (hasToken && !authFailureRef.current) {
+        refreshAnnouncement();
+      }
     }, 60000);
     return () => window.clearInterval(interval);
-  }, [refreshAnnouncement]);
+  }, []); // intentionally empty deps
 
   const updateAnnouncement = useCallback(
     async (next: SiteAnnouncement | ((prev: SiteAnnouncement) => SiteAnnouncement)) => {

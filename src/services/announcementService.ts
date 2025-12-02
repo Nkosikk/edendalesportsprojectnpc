@@ -12,6 +12,10 @@ type SaveAnnouncementPayload = {
   end_date?: string | null;
 };
 
+// Simple in-module throttling cache to prevent hammering endpoints during dev/HMR
+let lastFetchCurrentTs = 0;
+let lastFetchCurrentResult: Announcement | null = null;
+
 const normalizeAnnouncement = (payload: any): Announcement => {
   const message = (payload?.message ?? payload?.text ?? payload?.content ?? '').toString();
   const activeRaw = payload?.active ?? payload?.is_active ?? payload?.enabled ?? payload?.status ?? payload?.visible;
@@ -88,6 +92,15 @@ const handleResponse = async (promise: Promise<any>) => {
   }
 };
 
+const hasAuthToken = () => {
+  if (typeof window === 'undefined') return false;
+  try {
+    return Boolean(localStorage.getItem('accessToken'));
+  } catch {
+    return false;
+  }
+};
+
 const toggleAnnouncement = async (id: number, shouldActivate: boolean): Promise<Announcement> => {
   if (!id) {
     throw new Error('Announcement ID is required');
@@ -133,52 +146,85 @@ const requireTitleAndMessage = (payload: SaveAnnouncementPayload) => {
 
 export const announcementService = {
   async fetchCurrent(): Promise<Announcement> {
+    const now = Date.now();
+    // If we fetched within the last 5s, return cached result (prevents rapid loops on unauthorized responses)
+    if (lastFetchCurrentResult && now - lastFetchCurrentTs < 5000) {
+      return lastFetchCurrentResult;
+    }
+
     try {
       const publicAnnouncements = await this.fetchPublic();
       if (publicAnnouncements.length > 0) {
-        return publicAnnouncements[0];
+        const result = publicAnnouncements[0];
+        lastFetchCurrentResult = result;
+        lastFetchCurrentTs = now;
+        return result;
       }
     } catch (error) {
       console.warn('announcementService.fetchCurrent public feed fallback failed:', error);
     }
 
     try {
-      const activeAnnouncements = await this.fetchAll({ is_active: true });
-      if (activeAnnouncements.length > 0) {
-        return activeAnnouncements.sort(
-          (a, b) =>
-            new Date(b.updated_at || b.updatedAt || '').getTime() -
-            new Date(a.updated_at || a.updatedAt || '').getTime()
-        )[0];
+      // Only attempt authenticated active list if token present
+      if (hasAuthToken()) {
+        const activeAnnouncements = await this.fetchAll({ is_active: true });
+        if (activeAnnouncements.length > 0) {
+          const result = activeAnnouncements.sort(
+            (a, b) =>
+              new Date(b.updated_at || b.updatedAt || '').getTime() -
+              new Date(a.updated_at || a.updatedAt || '').getTime()
+          )[0];
+          lastFetchCurrentResult = result;
+          lastFetchCurrentTs = now;
+          return result;
+        }
       }
     } catch (error) {
       // Fall back to legacy endpoints below
     }
 
     let lastError: unknown = null;
-    for (const path of fetchCandidates) {
-      try {
-        const payload = await handleResponse(
-          apiClient.get(path, {
-            headers: silentErrorHeaders,
-          })
-        );
+    const tokenPresent = hasAuthToken();
+    // Skip authenticated fallback probe chain entirely if no token
+    if (tokenPresent) {
+      for (const path of fetchCandidates) {
+        try {
+          const payload = await handleResponse(
+            apiClient.get(path, {
+              headers: silentErrorHeaders,
+            })
+          );
 
-        if (Array.isArray(payload)) {
-          if (payload.length === 0) {
-            continue;
+          if (Array.isArray(payload)) {
+            if (payload.length === 0) {
+              continue;
+            }
+            const result = normalizeAnnouncement(payload[0]);
+            lastFetchCurrentResult = result;
+            lastFetchCurrentTs = now;
+            return result;
           }
-          return normalizeAnnouncement(payload[0]);
-        }
 
-        return normalizeAnnouncement(payload);
-      } catch (error) {
-        lastError = error;
+          const result = normalizeAnnouncement(payload);
+          lastFetchCurrentResult = result;
+          lastFetchCurrentTs = now;
+          return result;
+        } catch (error: any) {
+          lastError = error;
+          const status = error?.response?.status;
+          if (status === 401 || status === 403) {
+            console.warn('announcementService.fetchCurrent stopping authenticated fallbacks due to auth failure.');
+            break;
+          }
+        }
       }
     }
 
     console.warn('announcementService.fetchCurrent failed to reach backend:', lastError);
-    return normalizeAnnouncement({ message: '', active: false });
+    const result = normalizeAnnouncement({ message: '', active: false });
+    lastFetchCurrentResult = result;
+    lastFetchCurrentTs = now;
+    return result;
   },
 
   async fetchAll(filters?: {
@@ -186,6 +232,10 @@ export const announcementService = {
     type?: Announcement['type'];
     target_audience?: Announcement['target_audience'];
   }): Promise<Announcement[]> {
+    // If no auth token present, skip hitting authenticated endpoints and return empty (public feed handled elsewhere)
+    if (!hasAuthToken()) {
+      return [];
+    }
     try {
       const params = new URLSearchParams();
 
@@ -212,8 +262,10 @@ export const announcementService = {
         return normalized;
       }
     } catch (error: any) {
-      if (error?.response?.status === 401) {
-        throw error;
+      const status = error?.response?.status;
+      if (status === 401 || status === 403) {
+        console.warn('announcementService.fetchAll requires authentication; returning empty list.');
+        return [];
       }
       console.warn('announcementService.fetchAll primary endpoint failed:', error);
     }
@@ -243,7 +295,12 @@ export const announcementService = {
         if (filtered.length > 0) {
           return filtered;
         }
-      } catch (fallbackError) {
+      } catch (fallbackError: any) {
+        const status = fallbackError?.response?.status;
+        if (status === 401 || status === 403) {
+          console.warn(`announcementService.fetchAll fallback ${path} unauthorized; stopping further attempts.`);
+          break;
+        }
         console.warn(`announcementService.fetchAll fallback failed for ${path}:`, fallbackError);
       }
     }
