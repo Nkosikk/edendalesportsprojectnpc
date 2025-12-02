@@ -87,7 +87,10 @@ const Header = () => {
             {user?.role === 'admin' && (
               <div className="relative">
                 <button
-                  onClick={() => setIsAdminOpen(!isAdminOpen)}
+                  onClick={() => {
+                    setIsProfileOpen(false);
+                    setIsAdminOpen(!isAdminOpen);
+                  }}
                   className={`inline-flex items-center px-1 pt-1 text-sm font-medium transition-colors ${
                     location.pathname.startsWith('/admin')
                       ? 'text-primary-600 border-b-2 border-primary-600'
@@ -123,7 +126,10 @@ const Header = () => {
             {isAuthenticated ? (
               <div className="relative">
                 <button
-                  onClick={() => setIsProfileOpen(!isProfileOpen)}
+                  onClick={() => {
+                    setIsAdminOpen(false);
+                    setIsProfileOpen(!isProfileOpen);
+                  }}
                   className="flex items-center space-x-2 text-gray-700 hover:text-gray-900 focus:outline-none"
                 >
                   <div className="h-8 w-8 bg-gray-300 rounded-full flex items-center justify-center">

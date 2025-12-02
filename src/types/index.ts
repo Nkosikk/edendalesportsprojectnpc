@@ -320,6 +320,12 @@ export interface UpdateBookingRequest {
   id?: number;
   booking_id?: number;
   bookingId?: number;
+  original_booking_date?: string;
+  originalBookingDate?: string;
+  original_start_time?: string;
+  originalStartTime?: string;
+  original_end_time?: string;
+  originalEndTime?: string;
 }
 
 export interface CreateFieldRequest {

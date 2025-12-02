@@ -162,6 +162,26 @@ const buildBookingPayload = (data: BookingPayloadSource, { includeFieldId }: { i
     payload.endTime = normalizedEnd;
   }
 
+  const originalDate = data.original_booking_date ?? (data as any).originalBookingDate;
+  if (originalDate) {
+    payload.original_booking_date = originalDate;
+    payload.originalBookingDate = originalDate;
+  }
+
+  const originalStartRaw = data.original_start_time ?? (data as any).originalStartTime;
+  const originalEndRaw = data.original_end_time ?? (data as any).originalEndTime;
+  const normalizedOriginalStart = originalStartRaw ? toApiTime(originalStartRaw) : undefined;
+  const normalizedOriginalEnd = originalEndRaw ? toApiTime(originalEndRaw) : undefined;
+
+  if (normalizedOriginalStart) {
+    payload.original_start_time = normalizedOriginalStart;
+    payload.originalStartTime = normalizedOriginalStart;
+  }
+  if (normalizedOriginalEnd) {
+    payload.original_end_time = normalizedOriginalEnd;
+    payload.originalEndTime = normalizedOriginalEnd;
+  }
+
   if (includeFieldId) {
     if (!payload.booking_date) throw new Error('Booking date is required for booking creation');
     if (!normalizedStart || !normalizedEnd) throw new Error('Start and end times are required for booking creation');

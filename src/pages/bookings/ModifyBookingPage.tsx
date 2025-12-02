@@ -109,6 +109,9 @@ const ModifyBookingPage = () => {
         duration_hours: duration,
         field_id: booking.field_id,
         booking_id: bookingId,
+        original_booking_date: booking.booking_date,
+        original_start_time: booking.start_time,
+        original_end_time: booking.end_time,
         notes: notes || undefined,
       });
     },
