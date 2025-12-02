@@ -315,6 +315,8 @@ export interface UpdateBookingRequest {
   notes?: string;
   duration_hours?: number;
   durationHours?: number;
+  field_id?: number;
+  fieldId?: number;
 }
 
 export interface CreateFieldRequest {

@@ -120,14 +120,17 @@ const deriveDurationHours = (data: BookingPayloadSource, normalizedStart?: strin
 const buildBookingPayload = (data: BookingPayloadSource, { includeFieldId }: { includeFieldId: boolean }) => {
   const payload: Record<string, any> = {};
 
-  if (includeFieldId) {
-    const fieldId = Number(data.field_id);
-    if (!Number.isFinite(fieldId)) {
+  const fieldIdCandidate = data.field_id ?? (data as any).fieldId ?? (data as any).field;
+  if (includeFieldId || fieldIdCandidate !== undefined) {
+    const fieldId = Number(fieldIdCandidate);
+    if (includeFieldId && !Number.isFinite(fieldId)) {
       throw new Error('Field ID is required for booking creation');
     }
-    payload.field_id = fieldId;
-    payload.fieldId = fieldId;
-    payload.field = fieldId;
+    if (Number.isFinite(fieldId)) {
+      payload.field_id = fieldId;
+      payload.fieldId = fieldId;
+      payload.field = fieldId;
+    }
   }
 
   if (data.booking_date) {

@@ -100,12 +100,14 @@ const ModifyBookingPage = () => {
     async () => {
       if (!startTime || !endTime) throw new Error('Please select a new time slot');
       if (!hasChanges) throw new Error('No changes to save');
+      if (!booking) throw new Error('Booking not loaded yet');
       
       return bookingService.updateBooking(bookingId, {
         booking_date: toLocalDateInputValue(date),
         start_time: startTime,
         end_time: endTime,
         duration_hours: duration,
+        field_id: booking.field_id,
         notes: notes || undefined,
       });
     },
@@ -123,7 +125,11 @@ const ModifyBookingPage = () => {
   );
 
   const handleSelect = (start: string, end: string, c: number) => {
-    setStart(start); setEnd(end); setCost(c);
+    const normalizedStart = normalizeTimeHM(start) || start;
+    const normalizedEnd = normalizeTimeHM(end) || end;
+    setStart(normalizedStart);
+    setEnd(normalizedEnd);
+    setCost(c);
   };
 
   // Invalid booking ID
