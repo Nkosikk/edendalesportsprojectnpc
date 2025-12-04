@@ -1,22 +1,7 @@
 import { BookingDetails } from '../types';
-import { apiClient } from '../lib/api';
 import { safeNumber } from '../lib/utils';
 
-export interface EmailInvoiceRequest {
-  booking_id: number;
-  booking_reference?: string;
-  user_id?: number;
-  recipient_email?: string;
-  subject?: string;
-  message?: string;
-  include_payment_link?: boolean;
-}
 
-export interface InvoiceEmailResponse {
-  success: boolean;
-  message: string;
-  email_id?: string;
-}
 
 class InvoiceService {
   /**
@@ -71,118 +56,66 @@ class InvoiceService {
    */
   private getInvoiceStyles(): string {
     return `
-      body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
-      .max-w-4xl { max-width: none; }
-      .mx-auto { margin: 0; }
-      .shadow-lg { box-shadow: none; }
-      table { border-collapse: collapse; width: 100%; margin: 20px 0; }
-      th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-      th { background-color: #f5f5f5; font-weight: bold; }
-      .text-right { text-align: right; }
-      .text-center { text-align: center; }
-      .font-bold { font-weight: bold; }
-      .text-lg { font-size: 1.125em; }
-      .text-xl { font-size: 1.25em; }
-      .text-2xl { font-size: 1.5em; }
-      .text-3xl { font-size: 1.875em; }
-      .mb-2 { margin-bottom: 8px; }
-      .mb-4 { margin-bottom: 16px; }
-      .mb-8 { margin-bottom: 32px; }
-      .mt-2 { margin-top: 8px; }
-      .p-4 { padding: 16px; }
-      .px-4 { padding-left: 16px; padding-right: 16px; }
-      .py-2 { padding-top: 8px; padding-bottom: 8px; }
-      .border { border: 1px solid #ddd; }
-      .rounded { border-radius: 4px; }
-      .bg-gray-50 { background-color: #f9f9f9; }
-      .bg-blue-50 { background-color: #eff6ff; }
-      .text-gray-600 { color: #666; }
-      .text-gray-700 { color: #555; }
-      .text-primary-600 { color: #2563eb; }
-      .bg-primary-600 { background-color: #2563eb; }
-      .text-white { color: white; }
-      .flex { display: flex; }
-      .items-center { align-items: center; }
-      .items-start { align-items: flex-start; }
-      .justify-center { justify-content: center; }
-      .justify-between { justify-content: space-between; }
-      .space-x-4 > * + * { margin-left: 16px; }
-      .flex-shrink-0 { flex-shrink: 0; }
-      .w-16 { width: 64px; }
-      .h-16 { height: 64px; }
-      .rounded-lg { border-radius: 8px; }
-      .object-contain { object-fit: contain; }
+      @page {
+        size: A4;
+        margin: 12mm;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      body { font-family: Arial, sans-serif; margin: 0; color: #1f2937; font-size: 12px; line-height: 1.45; background: #f3f4f6; }
+      #invoice-content { page-break-inside: avoid; }
+      .invoice-container { max-width: 720px; margin: 0 auto; background: #ffffff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px 20px; }
+      .invoice-header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #2563eb; padding-bottom: 12px; margin-bottom: 16px; }
+      .invoice-header-left { display: flex; align-items: center; gap: 12px; }
+      .invoice-logo { width: 90px; height: auto; object-fit: contain; }
+      .invoice-company-name { margin: 0; font-size: 20px; color: #0f172a; }
+      .invoice-company-meta { margin: 4px 0 0; color: #4b5563; font-size: 12px; line-height: 1.4; }
+      .invoice-header-right { text-align: right; font-size: 12px; color: #4b5563; }
+      .invoice-badge { display: inline-block; background: #eff6ff; border-radius: 8px; padding: 6px 12px; margin-bottom: 8px; }
+      .invoice-header-title { margin: 0; font-size: 18px; letter-spacing: 0.08em; }
+      .invoice-header-meta p { margin: 2px 0; }
+      .invoice-section { margin-bottom: 16px; page-break-inside: avoid; }
+      .invoice-section-title { margin: 0 0 6px; font-size: 14px; font-weight: 600; color: #1d4ed8; }
+      .invoice-section-body { background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 12px; font-size: 12px; }
+      .invoice-table { width: 100%; border-collapse: collapse; margin: 0; font-size: 12px; }
+      .invoice-table thead { background: #1d4ed8; color: #ffffff; }
+      .invoice-table th, .invoice-table td { padding: 6px 8px; border: 1px solid #e5e7eb; text-align: left; }
+      .invoice-table th { font-weight: 600; }
+      .invoice-table td { vertical-align: top; }
+      .invoice-totals { display: flex; justify-content: flex-end; margin: 12px 0 16px; }
+      .invoice-totals-box { width: 220px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 12px; }
+      .invoice-totals-row { display: flex; justify-content: space-between; margin-bottom: 4px; color: #4b5563; }
+      .invoice-totals-total { display: flex; justify-content: space-between; border-top: 1px solid #d1d5db; padding-top: 6px; margin-top: 6px; font-size: 13px; font-weight: 700; color: #111827; }
+      .invoice-payment { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-bottom: 16px; }
+      .invoice-payment-card { background: #f9fafb; border: 1px solid #d1d5db; border-radius: 8px; padding: 8px 12px; font-size: 12px; line-height: 1.45; page-break-inside: avoid; }
+      .payment-status-card { display: flex; flex-direction: column; gap: 6px; }
+      .payment-status-chip { display: flex; align-items: center; gap: 6px; font-weight: 600; }
+      .payment-status-dot { width: 8px; height: 8px; border-radius: 999px; display: inline-block; }
+      .payment-status-dot.paid { background: #16a34a; }
+      .payment-status-dot.pending { background: #ca8a04; }
+      .payment-status-dot.unpaid { background: #dc2626; }
+      .payment-status-text.paid { color: #15803d; }
+      .payment-status-text.pending { color: #a16207; }
+      .payment-status-text.unpaid { color: #b91c1c; }
+      .payment-status-card.status-paid { background: #ecfdf5; border-color: #bbf7d0; }
+      .payment-status-card.status-pending { background: #fffbeb; border-color: #fde68a; }
+      .payment-status-card.status-unpaid { background: #fef2f2; border-color: #fecaca; }
+      .refund-card { background: #fef2f2; border-color: #fecaca; color: #991b1b; }
+      .payment-instructions-card { background: #eff6ff; border-color: #bfdbfe; color: #1d4ed8; }
+      .payment-complete-card { background: #ecfdf5; border-color: #bbf7d0; color: #047857; }
+      .invoice-footer { border-top: 1px solid #d1d5db; padding-top: 8px; text-align: center; font-size: 11px; color: #4b5563; }
+      .invoice-footer strong { color: #1d4ed8; }
+      .refund-card p,
+      .payment-instructions-card p,
+      .payment-complete-card p { margin: 0; }
+      .invoice-payment-card h4 { margin: 0; font-size: 12px; font-weight: 600; color: #111827; }
+      @media print and (max-width: 720px) {
+        .invoice-payment { grid-template-columns: 1fr; }
+      }
       img { max-width: 100%; height: auto; }
     `;
   }
 
-  /**
-   * Send invoice via email (Admin only)
-   */
-  async emailInvoice(request: EmailInvoiceRequest): Promise<InvoiceEmailResponse> {
-    if (!request.recipient_email) {
-      throw new Error('Recipient email is required to send an invoice');
-    }
 
-    // Provide multiple alias fields to satisfy varying backends
-    const basePayload: Record<string, any> = {
-      booking_id: Number(request.booking_id),
-      bookingId: Number(request.booking_id),
-      id: Number(request.booking_id),
-      user_id: request.user_id,
-      recipient_email: request.recipient_email,
-      email: request.recipient_email,
-      to: request.recipient_email,
-      subject: request.subject || 'Your Sports Facility Booking Invoice',
-      message: request.message || 'Please find attached your booking invoice. Thank you for choosing our facility.',
-      include_payment_link: request.include_payment_link !== false, // default true
-      booking_reference: request.booking_reference,
-      booking_ref: request.booking_reference,
-      reference: request.booking_reference,
-      action: 'email_invoice',
-      admin_action: 'email_invoice',
-      task: 'email_invoice',
-      type: 'invoice_email',
-    };
-
-    const candidatePaths = [
-      '/admin/email-invoice',
-      '/admin/invoices/email',
-      '/admin/bookings/email-invoice',
-      `/admin/bookings/${Number(request.booking_id)}/email-invoice`,
-      '/invoices/email',
-      '/invoice/email',
-      `/bookings/${Number(request.booking_id)}/email-invoice`,
-      '/bookings/email-invoice',
-      '/admin/invoices/send',
-      '/admin/invoice/send',
-    ];
-
-    let lastError: any = null;
-    for (const path of candidatePaths) {
-      try {
-        const response = await apiClient.post(path, basePayload, {
-          headers: { 'X-Suppress-Error-Toast': '1' },
-        });
-
-        // Flexible success handling
-        const data: any = response?.data;
-        if (typeof data?.success === 'boolean') {
-          if (!data.success) throw new Error(data?.message || 'Email send failed');
-          return (data?.data as InvoiceEmailResponse) || { success: true, message: data?.message || 'Invoice email sent' };
-        }
-        if (response.status >= 200 && response.status < 300) {
-          return { success: true, message: 'Invoice email sent' } as InvoiceEmailResponse;
-        }
-      } catch (err: any) {
-        lastError = err;
-        // Try next path
-      }
-    }
-
-    const message = lastError?.response?.data?.message || lastError?.message || 'Failed to send invoice email';
-    throw new Error(message);
-  }
 
   /**
    * Generate invoice preview URL for email

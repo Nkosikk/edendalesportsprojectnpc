@@ -111,14 +111,51 @@ export const mergeAvailability = (
   availability.blocked_slots?.forEach(b => {
     const start = normalizeTimeHM(b.start_time);
     const end = normalizeTimeHM(b.end_time);
-    blockedMap.set(`${start}-${end}`, { status: b.status, reason: b.reason });
+    if (!start || !end) return;
+    const [startHour, startMinute] = extractTimeParts(start);
+    const [endHour, endMinute] = extractTimeParts(end);
+    const startMinutes = startHour * 60 + startMinute;
+    const endMinutes = endHour * 60 + endMinute;
+    if (endMinutes <= startMinutes) return;
+
+    const stepMinutes = 60;
+    for (let cursor = startMinutes; cursor < endMinutes; cursor += stepMinutes) {
+      const segmentStartHour = Math.floor(cursor / 60);
+      const segmentStartMinute = cursor % 60;
+      const segmentEndMinutes = Math.min(cursor + stepMinutes, endMinutes);
+      const segmentEndHour = Math.floor(segmentEndMinutes / 60);
+      const segmentEndMinute = segmentEndMinutes % 60;
+      blockedMap.set(`${pad(segmentStartHour)}:${pad(segmentStartMinute)}-${pad(segmentEndHour)}:${pad(segmentEndMinute)}`, { status: b.status, reason: b.reason });
+    }
   });
 
   const availMap = new Map<string, { available: boolean; price: number }>();
   availability.slots?.forEach(s => {
     const start = normalizeTimeHM(s.start_time);
     const end = normalizeTimeHM(s.end_time);
-    availMap.set(`${start}-${end}`, { available: s.available, price: s.price });
+    if (!start || !end) return;
+
+    const [startHour, startMinute] = extractTimeParts(start);
+    const [endHour, endMinute] = extractTimeParts(end);
+    const startMinutes = startHour * 60 + startMinute;
+    const endMinutes = endHour * 60 + endMinute;
+    if (endMinutes <= startMinutes) return;
+
+    const stepMinutes = 60;
+    for (let cursor = startMinutes; cursor < endMinutes; cursor += stepMinutes) {
+      const segmentStartHour = Math.floor(cursor / 60);
+      const segmentStartMinute = cursor % 60;
+      const segmentEndMinutes = Math.min(cursor + stepMinutes, endMinutes);
+      const segmentEndHour = Math.floor(segmentEndMinutes / 60);
+      const segmentEndMinute = segmentEndMinutes % 60;
+      const segmentStart = `${pad(segmentStartHour)}:${pad(segmentStartMinute)}`;
+      const segmentEnd = `${pad(segmentEndHour)}:${pad(segmentEndMinute)}`;
+      const key = `${segmentStart}-${segmentEnd}`;
+      const existing = availMap.get(key);
+      const price = Number.isFinite(Number(s.price)) ? Number(s.price) : existing?.price;
+      const available = existing ? existing.available && Boolean(s.available) : Boolean(s.available);
+      availMap.set(key, { available, price: price ?? 0 });
+    }
   });
 
   return base.map(slot => {

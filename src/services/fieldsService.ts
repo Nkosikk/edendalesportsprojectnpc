@@ -33,6 +33,75 @@ const normalizeField = (f: any): SportsField => {
  * Handles field management and availability checking
  */
 
+const normalizeAvailabilityPayload = (
+  payload: any,
+  fieldFallback: { fieldId: number; date: string; duration: number }
+): FieldAvailability => {
+  const fld = payload?.field || {};
+  const hourly = fld.hourly_rate ?? fld.rate ?? 0;
+  const st = fld.sport_type ?? fld.field_type ?? 'multipurpose';
+
+  const toBool = (v: any) => v === true || v === 1 || v === '1' || String(v).toLowerCase() === 'true';
+  const num = (v: any, d = 0) => (v === null || v === undefined || v === '' ? d : Number(v));
+
+  const slotsSrc: any[] = Array.isArray(payload?.slots) ? payload.slots : [];
+  const slots = slotsSrc.map((s) => ({
+    start_time: normalizeTimeHM(String(s.start_time ?? s.start ?? '')),
+    end_time: normalizeTimeHM(String(s.end_time ?? s.end ?? '')),
+    available: toBool(s.available ?? s.is_available ?? s.free ?? true),
+    price: num(s.price ?? s.amount ?? hourly),
+  }));
+
+  const blockedSrc: any[] = Array.isArray(payload?.blocked_slots)
+    ? payload.blocked_slots
+    : Array.isArray(payload?.blocked)
+    ? payload.blocked
+    : [];
+  const blocked_slots = blockedSrc.map((b) => ({
+    start_time: normalizeTimeHM(String(b.start_time ?? b.start ?? '')),
+    end_time: normalizeTimeHM(String(b.end_time ?? b.end ?? '')),
+    status: (b.status ?? 'blocked') as 'blocked' | 'maintenance' | 'event',
+    reason: b.reason ?? undefined,
+  }));
+
+  return {
+    field: {
+      id: Number(fld.id ?? fieldFallback.fieldId),
+      name: String(fld.name ?? ''),
+      field_type: st,
+      hourly_rate: num(hourly),
+    },
+    date: String(payload?.date ?? fieldFallback.date),
+    duration_hours: num(payload?.duration_hours ?? fieldFallback.duration),
+    operating_hours: {
+      start_time: normalizeTimeHM(
+        String(payload?.operating_hours?.start_time ?? payload?.operating_start ?? '16:00')
+      ),
+      end_time: normalizeTimeHM(
+        String(payload?.operating_hours?.end_time ?? payload?.operating_end ?? '22:00')
+      ),
+    },
+    slots,
+    blocked_slots,
+  };
+};
+
+const fetchAvailabilityInternal = async (
+  fieldId: number,
+  date: string,
+  duration: number
+): Promise<FieldAvailability> => {
+  const response = await apiClient.get<ApiResponse<FieldAvailability | any>>(
+    `/fields/${fieldId}/availability`,
+    {
+      params: { date, duration },
+    }
+  );
+  const raw = handleApiResponse<any>(response, false);
+  const payload = raw?.availability || raw?.data || raw;
+  return normalizeAvailabilityPayload(payload, { fieldId, date, duration });
+};
+
 export const fieldService = {
   /**
    * Get all sports fields
@@ -77,59 +146,55 @@ export const fieldService = {
     date: string,
     duration = 1
   ): Promise<FieldAvailability> => {
-    const response = await apiClient.get<ApiResponse<FieldAvailability | any>>(
-      `/fields/${fieldId}/availability`,
-      {
-        params: { date, duration },
-      }
-    );
-    const raw = handleApiResponse<any>(response, false);
+    const primary = await fetchAvailabilityInternal(fieldId, date, duration);
 
-    const payload = raw?.availability || raw?.data || raw;
+    if (duration <= 1) {
+      return primary;
+    }
 
-    // Normalize nested field info
-    const fld = payload?.field || {};
-    const hourly = fld.hourly_rate ?? fld.rate ?? 0;
-    const st = fld.sport_type ?? fld.field_type ?? 'multipurpose';
+    try {
+      const baseline = await fetchAvailabilityInternal(fieldId, date, 1);
 
-    // Normalize slots
-    const toBool = (v: any) => v === true || v === 1 || v === '1' || String(v).toLowerCase() === 'true';
-    const num = (v: any, d = 0) => (v === null || v === undefined || v === '' ? d : Number(v));
+      const slotMap = new Map<string, { start_time: string; end_time: string; available: boolean; price: number }>();
+      primary.slots.forEach((slot) => {
+        const key = `${slot.start_time}-${slot.end_time}`;
+        slotMap.set(key, { ...slot });
+      });
 
-    const slotsSrc: any[] = Array.isArray(payload?.slots) ? payload.slots : [];
-    const slots = slotsSrc.map((s) => ({
-      start_time: normalizeTimeHM(String(s.start_time ?? s.start ?? '')),
-      end_time: normalizeTimeHM(String(s.end_time ?? s.end ?? '')),
-      available: toBool(s.available ?? s.is_available ?? s.free ?? true),
-      price: num(s.price ?? s.amount ?? hourly),
-    }));
+      baseline.slots.forEach((slot) => {
+        const key = `${slot.start_time}-${slot.end_time}`;
+        const existing = slotMap.get(key);
+        if (existing) {
+          if (!slot.available) existing.available = false;
+          if (!existing.price && slot.price) existing.price = slot.price;
+        } else {
+          slotMap.set(key, { ...slot });
+        }
+      });
 
-    const blockedSrc: any[] = Array.isArray(payload?.blocked_slots) ? payload.blocked_slots : (Array.isArray(payload?.blocked) ? payload.blocked : []);
-    const blocked_slots = blockedSrc.map((b) => ({
-      start_time: normalizeTimeHM(String(b.start_time ?? b.start ?? '')),
-      end_time: normalizeTimeHM(String(b.end_time ?? b.end ?? '')),
-      status: (b.status ?? 'blocked') as 'blocked' | 'maintenance' | 'event',
-      reason: b.reason ?? undefined,
-    }));
+      const mergedSlots = Array.from(slotMap.values()).sort((a, b) =>
+        a.start_time.localeCompare(b.start_time)
+      );
 
-    const normalized: FieldAvailability = {
-      field: {
-        id: Number(fld.id ?? fieldId),
-        name: String(fld.name ?? ''),
-        field_type: st,
-        hourly_rate: num(hourly),
-      },
-      date: String(payload?.date ?? date),
-      duration_hours: num(payload?.duration_hours ?? duration),
-      operating_hours: {
-        start_time: normalizeTimeHM(String(payload?.operating_hours?.start_time ?? payload?.operating_start ?? '16:00')),
-        end_time: normalizeTimeHM(String(payload?.operating_hours?.end_time ?? payload?.operating_end ?? '22:00')),
-      },
-      slots,
-      blocked_slots,
-    };
+      const blockedKey = (slot: { start_time: string; end_time: string }) => `${slot.start_time}-${slot.end_time}`;
+      const primaryBlocked = Array.isArray(primary.blocked_slots) ? primary.blocked_slots : [];
+      const baselineBlocked = Array.isArray(baseline.blocked_slots) ? baseline.blocked_slots : [];
+      const blockedSet = new Set(primaryBlocked.map(blockedKey));
+      baselineBlocked.forEach((slot) => {
+        const key = blockedKey(slot);
+        if (!blockedSet.has(key)) {
+          primaryBlocked.push(slot);
+        }
+      });
 
-    return normalized;
+      primary.blocked_slots = primaryBlocked;
+
+      primary.slots = mergedSlots;
+    } catch (error) {
+      console.warn('fieldService.getFieldAvailability: unable to merge baseline availability', error);
+    }
+
+    return primary;
   },
 
   /**

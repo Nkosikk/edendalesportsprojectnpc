@@ -14,6 +14,7 @@ interface BookingOverviewProps {
   metrics: BookingOverviewMetrics;
   title?: string;
   compact?: boolean;
+  onMetricClick?: (metric: keyof BookingOverviewMetrics) => void;
 }
 
 const statConfig: { key: keyof BookingOverviewMetrics; label: string; format?: (v: number) => string }[] = [
@@ -25,8 +26,9 @@ const statConfig: { key: keyof BookingOverviewMetrics; label: string; format?: (
   { key: 'total_users', label: 'Users' },
 ];
 
-const BookingOverview: React.FC<BookingOverviewProps> = ({ metrics, title = 'Overview', compact }) => {
+const BookingOverview: React.FC<BookingOverviewProps> = ({ metrics, title = 'Overview', compact, onMetricClick }) => {
   const activeStats = statConfig.filter(s => typeof metrics[s.key] === 'number');
+  const isInteractive = typeof onMetricClick === 'function';
   return (
     <div>
       {!compact && <h2 className="text-lg font-semibold mb-4">{title}</h2>}
@@ -34,8 +36,27 @@ const BookingOverview: React.FC<BookingOverviewProps> = ({ metrics, title = 'Ove
         {activeStats.map(stat => {
           const raw = metrics[stat.key] as number;
           const display = stat.format ? stat.format(raw) : raw.toString();
+          const baseClasses = 'rounded-lg border bg-white p-4 shadow-sm h-full';
+          const interactiveClasses = isInteractive
+            ? ' transition-transform hover:-translate-y-1 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-green-500 cursor-pointer'
+            : '';
+
+          if (isInteractive) {
+            return (
+              <button
+                key={stat.key}
+                type="button"
+                onClick={() => onMetricClick?.(stat.key)}
+                className={`${baseClasses}${interactiveClasses}`}
+              >
+                <p className="text-xs font-medium text-gray-600 mb-1">{stat.label}</p>
+                <p className="text-xl font-bold text-gray-900">{display}</p>
+              </button>
+            );
+          }
+
           return (
-            <div key={stat.key} className="rounded-lg border bg-white p-4 shadow-sm">
+            <div key={stat.key} className={baseClasses}>
               <p className="text-xs font-medium text-gray-600 mb-1">{stat.label}</p>
               <p className="text-xl font-bold text-gray-900">{display}</p>
             </div>

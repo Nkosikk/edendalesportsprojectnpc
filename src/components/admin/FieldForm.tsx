@@ -50,15 +50,31 @@ const FieldForm = ({ onCreated, onUpdated, editingField, onCancelEdit }: FieldFo
   };
 
   const handleSubmit = async () => {
+    // Prevent double submission
+    if (loading) return;
+    
+    // Dismiss any existing toasts to prevent duplicates
+    toast.dismiss();
+    
+    // Validate field name before triggering loading state to avoid stuck buttons
+    const nameError = validateFieldName(form.name);
+    if (nameError) {
+      toast.error(nameError);
+      return;
+    }
+
+    if (!Number.isFinite(form.capacity) || form.capacity <= 0) {
+      toast.error('Capacity must be a positive number');
+      return;
+    }
+
+    if (!Number.isFinite(form.hourly_rate) || form.hourly_rate <= 0) {
+      toast.error('Hourly rate must be a positive amount');
+      return;
+    }
+
     try {
       setLoading(true);
-      
-      // Validate field name
-      const nameError = validateFieldName(form.name);
-      if (nameError) {
-        toast.error(nameError);
-        return;
-      }
 
       if (editingField) {
         const updated = await fieldService.updateField(editingField.id, form);

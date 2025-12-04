@@ -101,25 +101,49 @@ const ModifyBookingPage = () => {
       if (!startTime || !endTime) throw new Error('Please select a new time slot');
       if (!hasChanges) throw new Error('No changes to save');
       if (!booking) throw new Error('Booking not loaded yet');
-      
-      return bookingService.updateBooking(bookingId, {
-        booking_date: toLocalDateInputValue(date),
-        start_time: startTime,
-        end_time: endTime,
-        duration_hours: duration,
+
+      const normalizedStart = normalizeTimeHM(startTime) || startTime;
+      const normalizedEnd = normalizeTimeHM(endTime) || endTime;
+
+      const newBooking = await bookingService.createBooking({
         field_id: booking.field_id,
-        booking_id: bookingId,
-        original_booking_date: booking.booking_date,
-        original_start_time: booking.start_time,
-        original_end_time: booking.end_time,
+        booking_date: toLocalDateInputValue(date),
+        start_time: normalizedStart,
+        end_time: normalizedEnd,
+        duration_hours: duration,
         notes: notes || undefined,
       });
+
+      let cancelFailed = false;
+      let cancelErrorMessage: string | undefined;
+      if (booking.status !== 'cancelled') {
+        try {
+          const reason = `Rescheduled via edit${newBooking?.booking_reference ? ` (#${newBooking.booking_reference})` : ''}`;
+          await bookingService.cancelBooking(bookingId, reason);
+        } catch (error: any) {
+          console.error('Failed to cancel original booking after reschedule', error);
+          cancelFailed = true;
+          cancelErrorMessage = error?.response?.data?.message || error?.message;
+        }
+      }
+
+      return { newBooking, cancelFailed, cancelErrorMessage };
     },
     {
-      onSuccess: () => {
-        toast.success('Booking updated successfully');
+      onSuccess: ({ newBooking, cancelFailed, cancelErrorMessage }) => {
+        if (cancelFailed) {
+          toast.success('New booking created, but please cancel the original booking manually.');
+          if (cancelErrorMessage) {
+            toast.error(cancelErrorMessage);
+          }
+        } else {
+          toast.success('New booking created and original booking archived as cancelled.');
+        }
         qc.invalidateQueries(['bookings']);
         qc.invalidateQueries(['booking', bookingId]);
+        if (newBooking?.id) {
+          qc.invalidateQueries(['booking', newBooking.id]);
+        }
         navigate('/app/bookings');
       },
       onError: (e: any) => {
@@ -192,13 +216,38 @@ const ModifyBookingPage = () => {
     );
   }
 
-  if (!canEdit) {
+  // Check if booking is in the past
+  const isPastBooking = (() => {
+    try {
+      const bookingDateTime = new Date(`${booking.booking_date}T${booking.start_time}`);
+      return bookingDateTime < new Date();
+    } catch {
+      return false;
+    }
+  })();
+
+  if (!canEdit && booking.status !== 'cancelled') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <AlertTriangle className="mx-auto h-12 w-12 text-amber-500 mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Cannot Edit Booking</h2>
           <p className="text-gray-600 mb-4">This booking cannot be edited because it has been {booking.status}.</p>
+          <Link to="/app/bookings">
+            <Button variant="outline" icon={ArrowLeft}>Back to Bookings</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (isPastBooking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="mx-auto h-12 w-12 text-amber-500 mb-4" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Cannot Edit Past Booking</h2>
+          <p className="text-gray-600 mb-4">This booking cannot be edited because it has already occurred.</p>
           <Link to="/app/bookings">
             <Button variant="outline" icon={ArrowLeft}>Back to Bookings</Button>
           </Link>
@@ -274,7 +323,7 @@ const ModifyBookingPage = () => {
               fieldId={booking.field_id} 
               date={date} 
               duration={duration}
-              initialStartTime={booking.start_time}
+              initialStartTime={startTime || booking.start_time}
               onSelect={handleSelect}
             />
           ) : (

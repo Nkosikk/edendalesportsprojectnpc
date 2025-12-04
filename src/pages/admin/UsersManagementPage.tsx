@@ -87,9 +87,9 @@ const UsersManagementPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Users Management</h1>
+    <div className="container mx-auto px-4 py-4 max-w-screen-xl">
+      <div className="mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Users Management</h1>
       </div>
 
       <Card className="mb-4">
@@ -130,18 +130,20 @@ const UsersManagementPage: React.FC = () => {
           data={users}
           keyExtractor={(u) => u.id.toString()}
           columns={[
-            { key: 'id', title: 'ID' },
-            { key: 'email', title: 'Email' },
-            { key: 'first_name', title: 'First Name' },
-            { key: 'last_name', title: 'Last Name' },
+            { key: 'id', title: 'ID', className: 'w-[6%]' },
+            { key: 'email', title: 'Email', className: 'w-[25%] truncate' },
+            { key: 'first_name', title: 'First Name', className: 'w-[15%] truncate' },
+            { key: 'last_name', title: 'Last Name', className: 'w-[15%] truncate' },
             {
               key: 'role',
               title: 'Role',
-              render: (v) => <Badge variant={getStatusBadgeVariant(v)}>{String(v).toUpperCase()}</Badge>,
+              className: 'w-[10%]',
+              render: (v) => <Badge variant={getStatusBadgeVariant(v)} className="text-xs px-1 py-0.5">{String(v).toUpperCase()}</Badge>,
             },
             {
               key: 'is_active',
               title: 'Active',
+              className: 'w-[20%]',
               render: (v: boolean, row: User) => {
                 const isActive = Boolean(v);
                 
@@ -150,6 +152,7 @@ const UsersManagementPage: React.FC = () => {
                     size="sm" 
                     variant={isActive ? 'secondary' : 'primary'} 
                     onClick={() => changeStatus(row.id, !isActive)}
+                    className="text-xs px-1.5 py-0.5"
                   >
                     {isActive ? 'Deactivate' : 'Activate'}
                   </Button>
@@ -159,6 +162,7 @@ const UsersManagementPage: React.FC = () => {
             {
               key: 'actions',
               title: 'ACTIONS',
+              className: 'w-[9%]',
               render: (_: any, row: User) => (
                 <div className="relative inline-block text-left">
                   <button

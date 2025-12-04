@@ -4,9 +4,9 @@ import Button from '../ui/Button';
 import InvoiceGenerator from './InvoiceGenerator';
 import { BookingDetails } from '../../types';
 import { invoiceService } from '../../services/invoiceService';
-import { useAuth } from '../../contexts/AuthContext';
+
 import toast from 'react-hot-toast';
-import { Download, Mail, FileText } from 'lucide-react';
+import { Download, FileText } from 'lucide-react';
 import { getRefundAdjustedAmount, getExplicitRefundAmount, formatCurrency } from '../../lib/utils';
 
 interface InvoiceModalProps {
@@ -20,14 +20,8 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
   onClose,
   booking
 }) => {
-  const { user } = useAuth();
-  const [emailSending, setEmailSending] = useState(false);
+
   const [downloading, setDownloading] = useState(false);
-  const [emailData, setEmailData] = useState({
-    recipient: booking?.email || '',
-    subject: `Invoice for Booking ${booking?.booking_reference || 'N/A'}`,
-    message: `Dear ${booking?.first_name || 'Customer'},\n\nPlease find attached your invoice for the sports facility booking.\n\nBooking Details:\n- Field: ${booking?.field_name || 'N/A'}\n- Date: ${booking?.booking_date || 'N/A'}\n- Time: ${booking?.start_time || 'N/A'} - ${booking?.end_time || 'N/A'}\n\nThank you for choosing our facility.\n\nBest regards,\nEdendale Sports Complex`
-  });
 
   const handleDownload = async () => {
     try {
@@ -41,21 +35,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     }
   };
 
-  const handleEmailInvoice = async () => {
-    if (!user || user.role !== 'admin') {
-      toast.error('Only administrators can send invoices via email');
-      return;
-    }
 
-    try {
-      setEmailSending(true);
-      toast('Invoice emailing is coming soon.');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to send invoice');
-    } finally {
-      setEmailSending(false);
-    }
-  };
 
   const validation = invoiceService.validateInvoiceData(booking);
   const adjustedAmount = getRefundAdjustedAmount(booking);
@@ -113,84 +93,15 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         </div>
 
         {/* Actions */}
-        <div className="space-y-4">
-          <div className="flex gap-3">
-            <Button
-              onClick={handleDownload}
-              loading={downloading}
-              icon={Download}
-              className="flex-1"
-            >
-              Download PDF
-            </Button>
-            
-            {user?.role === 'admin' && (
-              <Button
-                onClick={() => {/* Toggle email form */}}
-                variant="outline"
-                icon={Mail}
-                className="flex-1"
-              >
-                Send via Email
-              </Button>
-            )}
-          </div>
-
-          {/* Email Form (Admin Only) */}
-          {user?.role === 'admin' && (
-            <div className="border rounded-lg p-4 space-y-4">
-              <h5 className="font-medium text-gray-900">Send Invoice via Email</h5>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Recipient Email
-                  </label>
-                  <input
-                    type="email"
-                    value={emailData.recipient}
-                    onChange={(e) => setEmailData(prev => ({ ...prev, recipient: e.target.value }))}
-                    className="input w-full"
-                    placeholder="customer@example.com"
-                  />
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Subject
-                  </label>
-                  <input
-                    type="text"
-                    value={emailData.subject}
-                    onChange={(e) => setEmailData(prev => ({ ...prev, subject: e.target.value }))}
-                    className="input w-full"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email Message
-                </label>
-                <textarea
-                  value={emailData.message}
-                  onChange={(e) => setEmailData(prev => ({ ...prev, message: e.target.value }))}
-                  rows={4}
-                  className="input w-full"
-                  placeholder="Enter your email message..."
-                />
-              </div>
-
-              <Button
-                onClick={handleEmailInvoice}
-                loading={emailSending}
-                icon={Mail}
-                className="w-full"
-              >
-                Send Invoice Email
-              </Button>
-            </div>
-          )}
+        <div className="flex justify-center">
+          <Button
+            onClick={handleDownload}
+            loading={downloading}
+            icon={Download}
+            className="px-8"
+          >
+            Download PDF
+          </Button>
         </div>
       </div>
     </Modal>

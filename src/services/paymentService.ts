@@ -24,10 +24,16 @@ export const paymentService = {
    * Confirm manual payment (Staff/Admin only)
    */
   confirmPayment: async (paymentId?: number, bookingId?: number): Promise<void> => {
-    const response = await apiClient.post<ApiResponse>('/payments/confirm', {
-      payment_id: paymentId,
-      booking_id: bookingId,
-    });
+    const response = await apiClient.post<ApiResponse>(
+      '/payments/confirm',
+      {
+        payment_id: paymentId,
+        booking_id: bookingId,
+      },
+      {
+        suppressErrorToast: true,
+      } as any
+    );
     return handleApiResponse<void>(response);
   },
 

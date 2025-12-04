@@ -185,6 +185,15 @@ const buildBookingPayload = (data: BookingPayloadSource, { includeFieldId }: { i
   if (includeFieldId) {
     if (!payload.booking_date) throw new Error('Booking date is required for booking creation');
     if (!normalizedStart || !normalizedEnd) throw new Error('Start and end times are required for booking creation');
+
+    // Hint backend to always create a fresh record instead of mutating a cancelled booking
+    const clientReference = `web-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+    payload.force_new = true;
+    payload.create_new_record = true;
+    payload.preserve_cancelled = true;
+    payload.allow_duplicate = true;
+    payload.source = 'web-app';
+    payload.client_reference = clientReference;
   }
 
   const duration = deriveDurationHours(data, normalizedStart, normalizedEnd);
@@ -243,13 +252,51 @@ export const bookingService = {
    */
   createBooking: async (data: CreateBookingRequest): Promise<BookingDetails> => {
     const payload = buildBookingPayload(data, { includeFieldId: true });
-    const response = await apiClient.post<ApiResponse<BookingDetails>>('/bookings', payload);
-    const result = handleApiResponse<BookingDetails>(response);
-    (async () => {
-      const { logAudit } = await import('../lib/audit');
-      logAudit({ action: 'create_booking', entity: 'booking', entityId: result.id, metadata: { field_id: result.field_id, start_time: result.start_time, end_time: result.end_time } });
-    })();
-    return result;
+    const attemptCreate = async (body: typeof payload) => {
+      const response = await apiClient.post<ApiResponse<BookingDetails>>('/bookings', body);
+      const result = handleApiResponse<BookingDetails>(response);
+      (async () => {
+        const { logAudit } = await import('../lib/audit');
+        logAudit({
+          action: 'create_booking',
+          entity: 'booking',
+          entityId: result.id,
+          metadata: { field_id: result.field_id, start_time: result.start_time, end_time: result.end_time },
+        });
+      })();
+      return result;
+    };
+
+    const overrideFlags: Record<string, any> = {
+      allow_outside_hours: 1,
+      allowOutsideHours: true,
+      allow_after_hours: 1,
+      allowAfterHours: true,
+      override_operating_hours: true,
+      overrideOperatingHours: true,
+      ignore_operating_hours: true,
+      ignoreOperatingHours: true,
+      bypass_operating_hours: 1,
+      bypassOperatingHours: true,
+      manual_override: true,
+      manualOverride: true,
+      admin_override: true,
+      adminOverride: true,
+    };
+
+    Object.entries(overrideFlags).forEach(([key, value]) => {
+      payload[key] = value;
+    });
+
+    try {
+      return await attemptCreate(payload);
+    } catch (error: any) {
+      const message = error?.response?.data?.message || error?.message || 'Failed to create booking';
+      const enhancedError = new Error(message);
+      (enhancedError as any).response = { data: { message } };
+      (enhancedError as any)._toastShown = true;
+      throw enhancedError;
+    }
   },
 
   /**

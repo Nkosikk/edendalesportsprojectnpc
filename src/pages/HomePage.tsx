@@ -2,7 +2,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useEffect, useMemo, useState } from 'react';
 import { Calendar, MapPin, Clock, Star, ShieldAlert } from 'lucide-react';
 import Button from '../components/ui/Button';
-import PublicAnnouncements from '../components/ui/PublicAnnouncements';
+
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { fieldService } from '../services/fieldsService';
@@ -12,7 +12,7 @@ const HomePage = () => {
   const navigate = useNavigate();
   const [fields, setFields] = useState<SportsField[]>([]);
   const [loadingFields, setLoadingFields] = useState<boolean>(true);
-  const [allFieldsFallback, setAllFieldsFallback] = useState<boolean>(false);
+
 
   // Booking widget state
   const [selectedFieldId, setSelectedFieldId] = useState<number | ''>('');
@@ -49,9 +49,6 @@ const HomePage = () => {
         // If no active fields found, fall back to all fields (admin may not have activated yet)
         if (!data || data.length === 0) {
           data = await fieldService.getAllFields(false);
-          setAllFieldsFallback(true);
-        } else {
-          setAllFieldsFallback(false);
         }
         setFields(data);
       } finally {
@@ -70,6 +67,34 @@ const HomePage = () => {
     } finally {
       setLoadingAvailability(false);
     }
+  };
+
+  // Filter out past time slots for today's date
+  const filterAvailableSlots = (slots: any[]) => {
+    if (!date || !slots) return slots;
+    
+    const selectedDate = new Date(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    selectedDate.setHours(0, 0, 0, 0);
+    
+    // Only filter if selected date is today
+    if (selectedDate.getTime() !== today.getTime()) {
+      return slots;
+    }
+    
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    
+    return slots.filter(slot => {
+      const [startHour, startMinute] = slot.start_time.split(':').map(Number);
+      const slotStartTime = startHour * 60 + startMinute;
+      const currentTime = currentHour * 60 + currentMinute;
+      
+      // Show slot if it starts at least 30 minutes from now
+      return slotStartTime > currentTime + 30;
+    });
   };
 
   const handleBook = (slot: { start_time: string; end_time: string }) => {
@@ -99,17 +124,9 @@ const HomePage = () => {
               Book Your Perfect <span className="text-primary-600">Sports Field 🚀</span>
             </h1>
             <p className="text-sm text-gray-600 max-w-2xl mx-auto">
-              Premium sports facilities at Edendale Sports Projects NPC. From football pitches to rugby fields.
+              Premium sports facilities at Edendale Sports Projects NPC.
             </p>
           </div>
-        </div>
-      </section>
-
-      {/* Announcements Section */}
-      <section className="py-3 bg-white border-t">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-base font-semibold text-gray-900 mb-2">Announcements</h2>
-          <PublicAnnouncements />
         </div>
       </section>
 
@@ -121,58 +138,61 @@ const HomePage = () => {
               <CardTitle className="text-base">Quick Booking</CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Field</label>
-                  {loadingFields ? (
-                    <div className="h-10 flex items-center"><LoadingSpinner size="sm" /></div>
-                  ) : (
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Field</label>
+                    {loadingFields ? (
+                      <div className="h-10 flex items-center"><LoadingSpinner size="sm" /></div>
+                    ) : (
+                      <select
+                        value={selectedFieldId}
+                        onChange={(e) => setSelectedFieldId(e.target.value ? Number(e.target.value) : '')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      >
+                        <option value="">Select Field</option>
+                        {fields.map((f) => (
+                          <option key={f.id} value={f.id}>
+                            {f.name} - R{Number(f.hourly_rate || 0).toFixed(0)}/hr
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                    <input
+                      type="date"
+                      value={date}
+                      onChange={(e) => setDate(e.target.value)}
+                      min={todayStr}
+                      max={maxDateStr}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Duration</label>
                     <select
-                      value={selectedFieldId}
-                      onChange={(e) => setSelectedFieldId(e.target.value ? Number(e.target.value) : '')}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      value={duration}
+                      onChange={(e) => setDuration(Number(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     >
-                      <option value="">Select Field</option>
-                      {fields.map((f) => (
-                        <option key={f.id} value={f.id}>
-                          {f.name}
-                        </option>
-                      ))}
+                      {[1,2,3,4].map((d) => <option key={d} value={d}>{d} hour{d > 1 ? 's' : ''}</option>)}
                     </select>
-                  )}
-                  {!loadingFields && fields.length === 0 && (
-                    <p className="mt-1 text-xs text-error-600">No fields available. Please check back later.</p>
-                  )}
-                  {!loadingFields && allFieldsFallback && fields.length > 0 && (
-                    <p className="mt-1 text-xs text-amber-600">Showing all fields (including inactive).</p>
-                  )}
+                  </div>
+                  <div className="flex flex-col justify-end">
+                    <Button 
+                      onClick={searchAvailability} 
+                      className="w-full py-2.5 font-semibold" 
+                      disabled={!selectedFieldId || !date}
+                      size="lg"
+                    >
+                      🔍 Search Slots
+                    </Button>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                  <input
-                    type="date"
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                    min={todayStr}
-                    max={maxDateStr}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  />
-                  <p className="mt-1 text-xs text-gray-500">Bookings allowed from today up to 30 days.</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Duration (hours)</label>
-                  <select
-                    value={duration}
-                    onChange={(e) => setDuration(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                  >
-                    {[1,2,3,4].map((d) => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                </div>
-                <div className="flex items-end">
-                  <Button onClick={searchAvailability} className="w-full" disabled={!selectedFieldId || !date}>
-                    Search
-                  </Button>
+                <div className="mt-3 text-center">
+                  <p className="text-xs text-gray-500">💡 Select your field and date to see available time slots • Bookings up to 30 days in advance</p>
                 </div>
               </div>
 
@@ -185,28 +205,48 @@ const HomePage = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div className="lg:col-span-2">
                       <h3 className="text-base font-semibold mb-2">Time Slots</h3>
-                      {availability.slots.length === 0 ? (
-                        <p className="text-gray-500">No available slots for the selected date.</p>
-                      ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {availability.slots.map((slot, idx) => (
-                            <div key={idx} className={`border rounded-lg p-3 ${slot.available ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
-                              <div className="flex items-center justify-between mb-1">
-                                <div className="font-medium text-sm text-gray-900">
+                      {(() => {
+                        const filteredSlots = filterAvailableSlots(availability.slots);
+                        return filteredSlots.length === 0 ? (
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                            <p className="text-amber-800 font-medium">No available slots for the selected date and time.</p>
+                            <p className="text-amber-700 text-sm mt-1">
+                              {date === todayStr 
+                                ? "Try selecting a future date or check back tomorrow for more availability."
+                                : "Please try a different date or contact us for assistance."}
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {filteredSlots.map((slot, idx) => (
+                            <div key={idx} className={`border-2 rounded-xl p-4 transition-all ${
+                              slot.available 
+                                ? 'border-green-200 bg-gradient-to-br from-green-50 to-green-100 hover:shadow-md' 
+                                : 'border-gray-200 bg-gray-50 opacity-60'
+                            }`}>
+                              <div className="flex items-center justify-between mb-2">
+                                <div className="font-bold text-gray-900">
                                   {slot.start_time} - {slot.end_time}
                                 </div>
                                 {!slot.available && (
-                                  <span className="text-xs text-gray-500">Unavailable</span>
+                                  <span className="bg-gray-200 text-gray-600 px-2 py-1 rounded-full text-xs font-medium">Unavailable</span>
                                 )}
                               </div>
-                              <div className="text-sm text-gray-600 mb-2">R {Number(slot.price || 0).toFixed(2)}</div>
+                              <div className="text-lg font-semibold text-primary-600 mb-3">R {Number(slot.price || 0).toFixed(2)}</div>
                               {slot.available ? (
-                                <Button size="sm" onClick={() => handleBook(slot)} className="w-full">Book Now</Button>
-                              ) : null}
+                                <Button size="sm" onClick={() => handleBook(slot)} className="w-full font-semibold">
+                                  ⚡ Book This Slot
+                                </Button>
+                              ) : (
+                                <div className="w-full py-2 text-center text-xs text-gray-500 font-medium">
+                                  Not Available
+                                </div>
+                              )}
                             </div>
-                          ))}
-                        </div>
-                      )}
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div>
                       <h3 className="text-base font-semibold mb-2 flex items-center gap-2"><ShieldAlert className="h-4 w-4 text-error-500"/> Blocked Slots</h3>
@@ -230,58 +270,95 @@ const HomePage = () => {
         </div>
       </section>
 
-      {/* Our Fields Section */}
-      <section className="py-4 bg-gray-50">
+      {/* Browse Our Fields Section */}
+      <section className="py-6 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Our Available Fields</h2>
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">🏟️ Browse Our Premium Fields</h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">Explore our world-class sports facilities. Each field is professionally maintained with modern amenities.</p>
+          </div>
           {loadingFields ? (
-            <div className="flex justify-center py-4"><LoadingSpinner /></div>
+            <div className="flex justify-center py-8"><LoadingSpinner /></div>
           ) : fields.length === 0 ? (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-              <p className="text-amber-800 font-medium mb-2">No active fields available at the moment.</p>
-              <p className="text-amber-700 text-sm">Please check back later or contact us for more information about field availability.</p>
+            <div className="bg-white border border-gray-200 rounded-xl p-8 text-center">
+              <div className="text-4xl mb-4">🏗️</div>
+              <p className="text-gray-800 font-medium mb-2">Fields Coming Soon!</p>
+              <p className="text-gray-600 text-sm">We're preparing amazing sports facilities for you. Check back soon!</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {fields.map((f) => (
-                <Card key={f.id} className="hover:shadow-md transition-shadow border-l-4 border-l-primary-500">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="flex items-center justify-between text-base">
-                      <span className="font-semibold">{f.name}</span>
-                      <span className="bg-primary-100 text-primary-700 px-2 py-1 rounded-full text-xs font-semibold">
-                        R {Number(f.hourly_rate || 0).toFixed(2)}/hr
-                      </span>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <div className="flex items-center">
-                        <span className="font-medium text-gray-900 w-16">Sport:</span> 
-                        <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs">{f.sport_type}</span>
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {fields.slice(0, 4).map((f) => (
+                  <Card key={f.id} className="hover:shadow-lg transition-all duration-200 border-0 bg-white overflow-hidden">
+                    <CardContent className="p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div>
+                          <h3 className="text-lg font-bold text-gray-900 mb-1">{f.name}</h3>
+                          <div className="flex items-center gap-2">
+                            <span className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-xs font-medium">
+                              {f.sport_type}
+                            </span>
+                            {f.capacity && (
+                              <span className="text-gray-500 text-sm">• {f.capacity} players</span>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="bg-primary-100 text-primary-700 px-3 py-2 rounded-lg">
+                            <div className="text-lg font-bold">R{Number(f.hourly_rate || 0).toFixed(0)}</div>
+                            <div className="text-xs">per hour</div>
+                          </div>
+                        </div>
                       </div>
-                      {f.capacity && (
-                        <div className="flex items-center">
-                          <span className="font-medium text-gray-900 w-16">Capacity:</span> 
-                          <span>{f.capacity} players</span>
-                        </div>
-                      )}
-                      {f.facilities && (
-                        <div className="mt-2">
-                          <span className="font-medium text-gray-900">Facilities:</span> 
-                          <p className="text-gray-600 text-xs mt-1">{f.facilities}</p>
-                        </div>
-                      )}
-                      {f.description && (
-                        <div className="mt-2">
-                          <span className="font-medium text-gray-900">About:</span> 
-                          <p className="text-gray-600 text-xs mt-1">{f.description}</p>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                      
+                      <div className="space-y-3">
+                        {f.facilities && (
+                          <div className="bg-gray-50 p-3 rounded-lg">
+                            <div className="text-xs font-semibold text-gray-700 mb-1">🏢 FACILITIES</div>
+                            <p className="text-sm text-gray-600">{f.facilities}</p>
+                          </div>
+                        )}
+                        {f.description && (
+                          <div className="bg-green-50 p-3 rounded-lg">
+                            <div className="text-xs font-semibold text-gray-700 mb-1">ℹ️ ABOUT THIS FIELD</div>
+                            <p className="text-sm text-gray-600">{f.description}</p>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+              
+              {fields.length > 4 && (
+                <div className="text-center mt-6">
+                  <p className="text-gray-600 mb-3">Plus {fields.length - 4} more field{fields.length - 4 > 1 ? 's' : ''} available</p>
+                  <Link to="/app/fields">
+                    <Button variant="outline" className="px-6">
+                      View All Fields →
+                    </Button>
+                  </Link>
+                </div>
+              )}
+              
+              <div className="mt-8 bg-primary-50 border border-primary-200 rounded-xl p-6 text-center">
+                <div className="text-2xl mb-2">⚡</div>
+                <h3 className="text-lg font-semibold text-primary-900 mb-2">Ready to Book?</h3>
+                <p className="text-primary-700 text-sm mb-4">Use the Quick Booking section above to check availability and secure your field!</p>
+                <div className="flex flex-wrap justify-center gap-3">
+                  <Link to="/register">
+                    <Button size="sm" className="px-4">
+                      🏃‍♂️ Sign Up Now
+                    </Button>
+                  </Link>
+                  <Link to="/app/fields">
+                    <Button variant="outline" size="sm" className="px-4">
+                      🔍 Browse All Fields
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </>
           )}
         </div>
       </section>

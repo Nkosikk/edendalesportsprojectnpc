@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from 'react-query';
 import { fieldService } from '../../services/fieldsService';
 import LoadingSpinner from '../ui/LoadingSpinner';
-import { mergeAvailability, AvailabilityMergedSlot, computeBookingCost, getOperatingHours, isWeekend, isPublicHoliday, generateHourlySlots, normalizeTimeHM } from '../../utils/scheduling';
+import { mergeAvailability, AvailabilityMergedSlot, computeBookingCost, isWeekend, isPublicHoliday, generateHourlySlots, normalizeTimeHM } from '../../utils/scheduling';
 import Button from '../ui/Button';
 import toast from 'react-hot-toast';
 
@@ -34,13 +34,6 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialS
   const dateStr = toLocalYMD(date);
   const durationHours = Math.max(1, Number(duration) || 1);
 
-  // Check if time slot is within operating hours
-  const isWithinOperatingHours = (timeStr: string) => {
-    const hour = parseInt(timeStr.split(':')[0]);
-    const { startHour, endHour } = getOperatingHours(date);
-    return hour >= startHour && hour < endHour;
-  };
-
   const { data, isLoading, error, refetch } = useQuery(
     ['fieldAvailability', fieldId, dateStr, durationHours],
     async () => {
@@ -71,8 +64,32 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialS
   );
 
   useEffect(() => {
-    setSelectedStart(null);
-  }, [fieldId, dateStr, durationHours, normalizedInitialStart]);
+    // Only clear selection if field or date changes, not duration
+    if (fieldId !== null && dateStr) {
+      setSelectedStart(null);
+    }
+  }, [fieldId, dateStr]);
+
+  // Separate effect for duration changes - validate current selection
+  useEffect(() => {
+    if (selectedStart && mergedSlots.length > 0) {
+      const startIndex = mergedSlots.findIndex(s => s.start === selectedStart);
+      if (startIndex !== -1) {
+        // Check if current selection is still valid with new duration
+        let stillValid = true;
+        for (let i = 0; i < durationHours; i++) {
+          const slot = mergedSlots[startIndex + i];
+          if (!slot || !slot.available || slot.blocked || slot.past) {
+            stillValid = false;
+            break;
+          }
+        }
+        if (!stillValid) {
+          setSelectedStart(null);
+        }
+      }
+    }
+  }, [durationHours, mergedSlots, selectedStart]);
 
   useEffect(() => {
     const merged = mergeAvailability(date, data);
@@ -130,7 +147,13 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialS
       const s = mergedSlots[startIndex + i];
       if (!s || !s.available || s.blocked || s.past) {
         toast.dismiss('unavailable-range');
-        toast.error('Selected range includes unavailable hours', { id: 'unavailable-range' });
+        const endSlot = mergedSlots[startIndex + durationHours - 1];
+        const endTime = endSlot?.end || `${start.split(':')[0]}:00`;
+        let message = `Cannot book ${start}-${endTime}: `;
+        if (s?.blocked) message += 'slot is blocked for maintenance';
+        else if (s?.past) message += 'time has already passed';
+        else message += 'slot is unavailable';
+        toast.error(message, { id: 'unavailable-range' });
         return;
       }
     }
@@ -182,22 +205,19 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialS
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {mergedSlots.map((slot, idx) => {
           const isSelected = selectedStart === slot.start;
-          const withinHours = isWithinOperatingHours(slot.start);
-          const baseUnavailable = !slot.available || slot.blocked || !withinHours || !!slot.past;
+          const baseUnavailable = !slot.available || slot.blocked || !!slot.past;
           const canStartHere = (() => {
             if (baseUnavailable) return false;
             for (let i = 0; i < durationHours; i++) {
               const s = mergedSlots[idx + i];
-              if (!s || !s.available || s.blocked || s.past || !isWithinOperatingHours(s.start)) return false;
+              if (!s || !s.available || s.blocked || s.past) return false;
             }
             return true;
           })();
           const disabled = baseUnavailable || !canStartHere;
-          const isBooked = !slot.available && !slot.blocked && withinHours && !slot.past;
-          const isAvailable = !disabled && withinHours && slot.available && !slot.blocked && !slot.past;
-          const title = !withinHours 
-            ? 'Outside operating hours'
-            : !baseUnavailable && !canStartHere
+          const isBooked = !slot.available && !slot.blocked && !slot.past;
+          const isAvailable = !disabled && slot.available && !slot.blocked && !slot.past;
+          const title = !baseUnavailable && !canStartHere
             ? 'Not enough continuous availability for selected duration'
             : undefined;
           
@@ -236,13 +256,10 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialS
               {!slot.blocked && slot.past && (
                 <div className="mt-1 text-[10px] font-medium">⏳ Past</div>
               )}
-              {!slot.blocked && !withinHours && (
-                <div className="mt-1 text-[10px] font-medium">⏰ Closed</div>
-              )}
-              {!slot.blocked && withinHours && !slot.available && (
+              {!slot.blocked && !slot.available && (
                 <div className="mt-1 text-[10px] font-medium">📅 Booked</div>
               )}
-              {withinHours && !baseUnavailable && !canStartHere && (
+              {!baseUnavailable && !canStartHere && (
                 <div className="mt-1 text-[10px] font-medium">⏱️ Too Short</div>
               )}
               {isAvailable && (
@@ -265,10 +282,7 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialS
           <span className="w-3 h-3 bg-orange-50 border border-orange-200 rounded" /> 
           <span>🚫 Blocked</span>
         </div>
-        <div className="flex items-center gap-1">
-          <span className="w-3 h-3 bg-gray-50 border border-gray-200 rounded" /> 
-          <span>⏰ Closed</span>
-        </div>
+
         <div className="flex items-center gap-1">
           <span className="w-3 h-3 bg-primary-50 border border-primary-600 rounded" /> 
           <span>Selected</span>

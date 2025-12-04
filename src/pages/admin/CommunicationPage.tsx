@@ -117,7 +117,7 @@ const CommunicationPage = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+    <div className="max-w-screen-xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div className="flex items-start gap-3">
           <span className="p-3 rounded-2xl bg-primary-100 text-primary-700">

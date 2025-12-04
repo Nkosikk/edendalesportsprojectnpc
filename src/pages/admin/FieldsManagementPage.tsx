@@ -8,11 +8,14 @@ import { Table } from '../../components/ui/Table';
 import { Card, CardContent } from '../../components/ui/Card';
 import FieldForm from '../../components/admin/FieldForm';
 import toast from 'react-hot-toast';
+import { isPublicHoliday } from '../../utils/scheduling';
 
 const FieldsManagementPage: React.FC = () => {
   const [fields, setFields] = useState<SportsField[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<SportsField | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const [sortBy, setSortBy] = useState<'id'|'name'|'sport_type'|'capacity'|'hourly_rate'|'is_active'>('name');
   const [sortDir, setSortDir] = useState<'asc'|'desc'>('asc');
@@ -40,6 +43,10 @@ const FieldsManagementPage: React.FC = () => {
   };
 
   useEffect(() => { load(); }, []);
+  
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [fields.length, pageSize]);
 
   const displayFields = (() => {
     const copy = [...fields];
@@ -56,6 +63,9 @@ const FieldsManagementPage: React.FC = () => {
     });
     return copy;
   })();
+
+  const totalPages = Math.ceil(displayFields.length / pageSize);
+  const paginatedFields = displayFields.slice((currentPage - 1) * pageSize, currentPage * pageSize);
 
   const toggleActive = async (field: SportsField) => {
     try {
@@ -103,13 +113,14 @@ const FieldsManagementPage: React.FC = () => {
     }
     
     // Check operating hours based on date
-    const blockDate = new Date(date);
-    const isWeekend = blockDate.getDay() === 0 || blockDate.getDay() === 6;
-    const operatingStart = isWeekend ? 9 : 16; // Weekend: 09:00, Weekday: 16:00
+    const blockDate = new Date(`${date}T00:00:00`);
+    const isWeekendDay = blockDate.getDay() === 0 || blockDate.getDay() === 6;
+    const holiday = isPublicHoliday(blockDate);
+    const operatingStart = (isWeekendDay || holiday) ? 9 : 16; // Weekend & holidays: 09:00, Weekday: 16:00
     const operatingEnd = 22; // Both: 22:00
     
-    if (startHour < operatingStart || endHour > operatingEnd) {
-      const hoursText = isWeekend ? '09:00-22:00' : '16:00-22:00';
+    if (startHour < operatingStart || endHour > operatingEnd || (endHour === operatingEnd && endMin > 0)) {
+      const hoursText = (isWeekendDay || holiday) ? '09:00-22:00' : '16:00-22:00';
       return `Time must be within operating hours: ${hoursText}`;
     }
     
@@ -120,6 +131,26 @@ const FieldsManagementPage: React.FC = () => {
     if (!blockFieldId || !blockDate) {
       toast.error('Field and date required');
       return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDate = new Date(`${blockDate}T00:00:00`);
+    if (selectedDate < today) {
+      toast.error(`Cannot block slots for ${blockDate}: date is in the past`);
+      return;
+    }
+    
+    // Additional validation for past times on today
+    if (selectedDate.getTime() === today.getTime()) {
+      const now = new Date();
+      const [startHour, startMin] = blockStart.split(':').map(Number);
+      const startTime = new Date();
+      startTime.setHours(startHour, startMin, 0, 0);
+      if (startTime <= now) {
+        toast.error(`Cannot block ${blockStart}-${blockEnd}: time has already passed`);
+        return;
+      }
     }
     
     // Validate time input
@@ -144,7 +175,14 @@ const FieldsManagementPage: React.FC = () => {
       load();
     } catch (e: any) {
       console.error('Block slot failed', e);
-      toast.error(e?.response?.data?.message || e?.message || 'Failed to block slot');
+      const rawMessage = e?.response?.data?.message || e?.message || '';
+      if (/already.*blocked/i.test(String(rawMessage))) {
+        toast.error(`Time slot ${blockStart}-${blockEnd} is already blocked`);
+      } else if (/overlap/i.test(String(rawMessage))) {
+        toast.error(`Cannot block ${blockStart}-${blockEnd}: overlaps with existing booking`);
+      } else {
+        toast.error(rawMessage || `Failed to block ${blockStart}-${blockEnd}`);
+      }
     } finally {
       setIsBlocking(false);
     }
@@ -154,6 +192,26 @@ const FieldsManagementPage: React.FC = () => {
     if (!blockFieldId || !blockDate) {
       toast.error('Field and date required');
       return;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const selectedDate = new Date(`${blockDate}T00:00:00`);
+    if (selectedDate < today) {
+      toast.error(`Cannot block slots for ${blockDate}: date is in the past`);
+      return;
+    }
+    
+    // Additional validation for past times on today
+    if (selectedDate.getTime() === today.getTime()) {
+      const now = new Date();
+      const [startHour, startMin] = blockStart.split(':').map(Number);
+      const startTime = new Date();
+      startTime.setHours(startHour, startMin, 0, 0);
+      if (startTime <= now) {
+        toast.error(`Cannot block ${blockStart}-${blockEnd}: time has already passed`);
+        return;
+      }
     }
     const payload = {
       field_id: Number(blockFieldId),
@@ -170,21 +228,26 @@ const FieldsManagementPage: React.FC = () => {
       load();
     } catch (e: any) {
       console.error('Unblock slot failed', e);
-      toast.error(e?.response?.data?.message || e?.message || 'Failed to unblock slot');
+      const rawMessage = e?.response?.data?.message || e?.message || '';
+      if (/already|not\s*found/i.test(String(rawMessage))) {
+        toast.error('Slot is already unblocked or could not be found');
+      } else {
+        toast.error(rawMessage || 'Failed to unblock slot');
+      }
     } finally {
       setIsUnblocking(false);
     }
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Fields Management</h1>
+    <div className="container mx-auto px-4 py-4 max-w-screen-xl">
+      <div className="mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Fields Management</h1>
       </div>
 
-      <Card className="mb-4">
-        <CardContent className="px-4 py-3">
-          <h2 className="text-base font-semibold mb-2">{editing ? 'Edit Field' : 'Create Field'}</h2>
+      <Card className="mb-3">
+        <CardContent className="px-3 py-2">
+          <h2 className="text-sm font-semibold mb-2">{editing ? 'Edit Field' : 'Create Field'}</h2>
           <div className="max-w-4xl">
             <FieldForm
               editingField={editing}
@@ -196,9 +259,9 @@ const FieldsManagementPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      <Card className="mb-6">
-        <CardContent>
-          <h2 className="text-lg font-semibold mb-4">Block / Unblock Slot</h2>
+      <Card className="mb-3">
+        <CardContent className="px-3 py-2">
+          <h2 className="text-sm font-semibold mb-2">Block / Unblock Slot</h2>
           <div className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
             <div className="flex flex-col">
               <label className="text-xs font-medium text-gray-700">Field</label>
@@ -237,63 +300,132 @@ const FieldsManagementPage: React.FC = () => {
 
       <Card>
         <CardContent>
-          <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-700 font-medium">Showing all fields (active & inactive)</span>
-            </div>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-gray-700">Sort by</span>
+          <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-gray-700 font-medium">Total: {displayFields.length} fields</span>
               <select
-                className="input text-sm"
+                className="input text-xs px-2 py-1"
+                value={pageSize}
+                onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
+              >
+                <option value={5}>5 per page</option>
+                <option value={10}>10 per page</option>
+                <option value={20}>20 per page</option>
+              </select>
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-gray-700">Sort:</span>
+              <select
+                className="input text-xs px-2 py-1"
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as any)}
               >
                 <option value="name">Name</option>
                 <option value="sport_type">Type</option>
                 <option value="capacity">Capacity</option>
-                <option value="hourly_rate">Hourly Rate</option>
+                <option value="hourly_rate">Rate</option>
                 <option value="is_active">Active</option>
-                <option value="id">ID</option>
               </select>
               <select
-                className="input text-sm"
+                className="input text-xs px-2 py-1"
                 value={sortDir}
                 onChange={(e) => setSortDir(e.target.value as any)}
               >
-                <option value="asc">Asc</option>
-                <option value="desc">Desc</option>
+                <option value="asc">↑</option>
+                <option value="desc">↓</option>
               </select>
             </div>
-            <Button size="sm" variant="outline" onClick={load} disabled={loading}>
+            <Button size="sm" variant="outline" onClick={load} disabled={loading} className="text-xs px-2 py-1">
               {loading ? 'Loading...' : 'Refresh'}
             </Button>
           </div>
           {loading ? (
             <div className="flex justify-center py-8"><LoadingSpinner /></div>
           ) : (
-            <Table
-              data={displayFields}
-              keyExtractor={(f) => f.id.toString()}
-              columns={[
-                { key: 'id', title: 'ID' },
-                { key: 'name', title: 'Name' },
-                { key: 'sport_type', title: 'Type' },
-                { key: 'capacity', title: 'Capacity' },
-                { key: 'hourly_rate', title: 'Hourly Rate', render: (v: number) => `R ${Number(v || 0).toFixed(2)}` },
-                { key: 'is_active', title: 'Active', render: (v: boolean) => v ? 'Yes' : 'No' },
-                {
-                  key: 'actions',
-                  title: 'Actions',
-                  render: (_: any, row: SportsField) => (
-                    <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => toggleActive(row)}>
-                        {row.is_active ? 'Deactivate' : 'Activate'}
-                      </Button>
-                    </div>
-                  )
-                }
-              ]}
-            />
+            <div>
+              <Table
+                data={paginatedFields}
+                keyExtractor={(f) => f.id.toString()}
+                columns={[
+                  { key: 'id', title: 'ID', className: 'w-[8%]' },
+                  { key: 'name', title: 'Name', className: 'w-[25%] truncate' },
+                  { key: 'sport_type', title: 'Type', className: 'w-[15%] truncate' },
+                  { key: 'capacity', title: 'Capacity', className: 'w-[12%]' },
+                  { key: 'hourly_rate', title: 'Rate', className: 'w-[15%]', render: (v: number) => `R ${Number(v || 0).toFixed(2)}` },
+                  { key: 'is_active', title: 'Status', className: 'w-[10%]', render: (v: boolean) => (
+                    <span className={`px-1.5 py-0.5 text-xs rounded-full ${
+                      v ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {v ? 'Active' : 'Inactive'}
+                    </span>
+                  ) },
+                  {
+                    key: 'actions',
+                    title: 'Actions',
+                    className: 'w-[15%]',
+                    render: (_: any, row: SportsField) => (
+                      <div className="flex gap-1">
+                        <Button size="sm" variant="outline" onClick={() => setEditing(row)} className="text-xs px-2 py-1">
+                          Edit
+                        </Button>
+                        <Button size="sm" variant={row.is_active ? 'secondary' : 'primary'} onClick={() => toggleActive(row)} className="text-xs px-2 py-1">
+                          {row.is_active ? 'Deactivate' : 'Activate'}
+                        </Button>
+                      </div>
+                    )
+                  }
+                ]}
+              />
+              
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-3 px-2">
+                  <div className="text-xs text-gray-600">
+                    Showing {(currentPage - 1) * pageSize + 1}-{Math.min(currentPage * pageSize, displayFields.length)} of {displayFields.length}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="text-xs px-2 py-1"
+                    >
+                      ««
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setCurrentPage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="text-xs px-2 py-1"
+                    >
+                      ‹
+                    </Button>
+                    <span className="text-xs px-2 py-1 bg-gray-100 rounded">
+                      {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setCurrentPage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="text-xs px-2 py-1"
+                    >
+                      ›
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="text-xs px-2 py-1"
+                    >
+                      »»
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

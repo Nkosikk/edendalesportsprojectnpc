@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { Calendar, Clock, Plus, Filter, FileText, Banknote } from 'lucide-react';
+import { Calendar, Clock, Plus, Filter, FileText, Banknote, RefreshCw } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
@@ -42,7 +42,7 @@ const BookingsPage = () => {
     }
   );
 
-  // Auto-refresh when user returns from payment tab - more aggressive
+  // Auto-refresh when user returns from payment tab - more aggressive + mobile support
   useEffect(() => {
     const handleFocus = () => {
       // Force immediate fresh fetch from server when returning to tab
@@ -60,12 +60,24 @@ const BookingsPage = () => {
       }
     };
 
+    // Mobile-specific refresh triggers
+    const handleTouchEnd = () => {
+      if (user && 'ontouchstart' in window) {
+        // Only refresh if user pulled down (simple heuristic)
+        if (window.scrollY === 0) {
+          queryClient.invalidateQueries(['bookings']);
+        }
+      }
+    };
+
     window.addEventListener('focus', handleFocus);
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('touchend', handleTouchEnd, { passive: true });
 
     return () => {
       window.removeEventListener('focus', handleFocus);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('touchend', handleTouchEnd);
     };
   }, [user, refetch, queryClient]);
 
@@ -181,14 +193,33 @@ const BookingsPage = () => {
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">My Bookings</h1>
             <p className="mt-2 text-gray-600">Manage your sports field reservations</p>
           </div>
-          <div className="mt-4 sm:mt-0">
-            <Link to="/app/bookings/new">
-              <Button icon={Plus} size="lg">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button
+              variant="outline"
+              size="lg"
+              icon={RefreshCw}
+              onClick={() => {
+                toast.dismiss();
+                toast.loading('Refreshing bookings...', { id: 'refresh-bookings' });
+                queryClient.invalidateQueries(['bookings']);
+                refetch({ throwOnError: false }).then(() => {
+                  toast.success('Bookings updated', { id: 'refresh-bookings' });
+                }).catch(() => {
+                  toast.error('Failed to refresh', { id: 'refresh-bookings' });
+                });
+              }}
+              disabled={isLoading}
+              className="w-full sm:w-auto"
+            >
+              Refresh
+            </Button>
+            <Link to="/app/bookings/new" className="w-full sm:w-auto">
+              <Button icon={Plus} size="lg" className="w-full">
                 New Booking
               </Button>
             </Link>

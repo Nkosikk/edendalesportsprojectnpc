@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { adminService } from '../../services/adminService';
 import { paymentService } from '../../services/paymentService';
 import { fieldService } from '../../services/fieldsService';
@@ -16,9 +17,32 @@ import { FileText, MoreVertical, Eye, Edit, Check, X, DollarSign } from 'lucide-
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
+const sanitizeAdminFiltersFromState = (source?: Partial<AdminBookingFilters>): AdminBookingFilters => {
+  if (!source) return {};
+  const result: AdminBookingFilters = {};
+  (Object.entries(source) as [keyof AdminBookingFilters, unknown][]).forEach(([key, value]) => {
+    if (value === undefined || value === null || value === '') {
+      return;
+    }
+    if (key === 'field_id') {
+      const numeric = typeof value === 'number' ? value : Number(value);
+      if (!Number.isNaN(numeric)) {
+        result.field_id = numeric;
+      }
+      return;
+    }
+    result[key] = value as any;
+  });
+  return result;
+};
+
 const BookingsManagementPage: React.FC = () => {
+  const location = useLocation();
   const [bookings, setBookings] = useState<BookingDetails[]>([]);
-  const [filters, setFilters] = useState<AdminBookingFilters>({});
+  const [filters, setFilters] = useState<AdminBookingFilters>(() => {
+    const state = location.state as { filters?: Partial<AdminBookingFilters> } | null;
+    return sanitizeAdminFiltersFromState(state?.filters);
+  });
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(() => {
@@ -57,8 +81,28 @@ const BookingsManagementPage: React.FC = () => {
   const autoCompletedRef = React.useRef<Set<number>>(new Set());
   const autoAttemptedRef = React.useRef<Set<number>>(new Set());
 
+  useEffect(() => {
+    const state = location.state as { filters?: Partial<AdminBookingFilters> } | null;
+    if (!state?.filters) return;
+    const sanitized = sanitizeAdminFiltersFromState(state.filters);
+    setFilters(prev => {
+      const keys = new Set<keyof AdminBookingFilters>([
+        ...(Object.keys(prev) as (keyof AdminBookingFilters)[]),
+        ...(Object.keys(sanitized) as (keyof AdminBookingFilters)[]),
+      ]);
+      for (const key of keys) {
+        if (prev[key] !== sanitized[key]) {
+          return sanitized;
+        }
+      }
+      if (keys.size === 0 && Object.keys(prev).length === 0) {
+        return prev;
+      }
+      return prev;
+    });
+  }, [location.key, location.state]);
+
   const shouldAutoComplete = (b: BookingDetails) => {
-    if (b.status !== 'confirmed') return false;
     // Compose a local datetime from booking_date and end_time
     const endStr = `${b.booking_date}T${(b.end_time || '').slice(0,8)}`; // HH:mm:ss
     const endAt = new Date(endStr);
@@ -74,7 +118,6 @@ const BookingsManagementPage: React.FC = () => {
     for (const b of candidates) {
       try {
         autoAttemptedRef.current.add(b.id);
-        await adminService.updateBookingStatus({ booking_id: b.id, status: 'completed' });
         autoCompletedRef.current.add(b.id);
         anySuccess = true;
       } catch (e) {
@@ -91,6 +134,8 @@ const BookingsManagementPage: React.FC = () => {
     return Number.isNaN(date.getTime()) ? null : date;
   };
 
+  // ...existing code...
+  // Ensure this logic is inside an async function, e.g. load()
   const load = async () => {
     console.log('BookingsManagementPage: Loading bookings with filters:', filters);
     try {
@@ -136,6 +181,7 @@ const BookingsManagementPage: React.FC = () => {
       });
       const fromDate = toDateOnly(cleanFilters.date_from as string | undefined);
       const toDate = toDateOnly(cleanFilters.date_to as string | undefined);
+      
       const withinRange = sorted.filter((booking) => {
         if (!fromDate && !toDate) return true;
         const bookingDate = toDateOnly(booking.booking_date);
@@ -166,7 +212,7 @@ const BookingsManagementPage: React.FC = () => {
         toast.error('No bookings found. Check if you have admin permissions or if bookings exist in the system.');
       }
       // Attempt auto-complete for any bookings whose end time has passed
-      const changed = await autoCompleteOverdue(bookings);
+      const changed = await autoCompleteOverdue(searchFiltered);
       if (changed) {
         // Refresh once to reflect completed statuses; no loops due to attemptedRef
         load();
@@ -480,15 +526,16 @@ const BookingsManagementPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-2 sm:px-4 py-8 max-w-full">
-      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl font-bold text-gray-900">Bookings Management</h1>
-        <div className="flex gap-2">
+    <div className="w-full px-2 sm:px-3 py-4 sm:py-6 max-w-screen-xl mx-auto">
+      <div className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Bookings Management</h1>
+        <div className="flex flex-wrap gap-2">
           <Button 
             variant="outline" 
             size="sm"
             onClick={exportToCSV}
             disabled={bookings.length === 0}
+            className="text-xs px-2 py-1"
           >
             Export CSV
           </Button>
@@ -497,21 +544,22 @@ const BookingsManagementPage: React.FC = () => {
             size="sm"
             onClick={exportToPDF}
             disabled={bookings.length === 0}
+            className="text-xs px-2 py-1"
           >
             Export PDF
           </Button>
         </div>
       </div>
 
-      <Card className="mb-4">
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <Card className="mb-3">
+        <CardContent className="p-3 sm:p-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
               <select
                 value={filters.status || ''}
                 onChange={(e) => setFilters({ ...filters, status: e.target.value || undefined })}
-                className="px-3 py-2 border rounded-lg w-full text-sm"
+                className="px-2 py-1.5 border rounded w-full text-xs"
               >
                 <option value="">All</option>
                 <option value="pending">Pending</option>
@@ -521,29 +569,29 @@ const BookingsManagementPage: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Payment</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Payment</label>
               <select
                 value={filters.payment_status || ''}
                 onChange={(e) => setFilters({ ...filters, payment_status: e.target.value || undefined })}
-                className="px-3 py-2 border rounded-lg w-full text-sm"
+                className="px-2 py-1.5 border rounded w-full text-xs"
               >
                 <option value="">All</option>
                 <option value="pending">Pending</option>
-                <option value="manual_pending">Manual Pending</option>
+                <option value="manual_pending">Manual</option>
                 <option value="paid">Paid</option>
                 <option value="failed">Failed</option>
                 <option value="refunded">Refunded</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Field</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">Field</label>
               <select
                 value={filters.field_id || ''}
                 onChange={(e) => setFilters({
                   ...filters,
                   field_id: e.target.value ? Number(e.target.value) : undefined,
                 })}
-                className="px-3 py-2 border rounded-lg w-full text-sm"
+                className="px-2 py-1.5 border rounded w-full text-xs"
                 disabled={fieldsLoading}
               >
                 <option value="">All Fields</option>
@@ -552,42 +600,42 @@ const BookingsManagementPage: React.FC = () => {
                 ))}
               </select>
               {fieldsLoading && (
-                <p className="text-[11px] text-gray-500 mt-1">Loading fields…</p>
+                <p className="text-[10px] text-gray-500 mt-0.5">Loading…</p>
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">From Date</label>
               <input
                 type="date"
                 value={filters.date_from || ''}
                 onChange={(e) => setFilters({ ...filters, date_from: e.target.value || undefined })}
-                className="px-3 py-2 border rounded-lg w-full text-sm"
+                className="px-2 py-1.5 border rounded w-full text-xs"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+              <label className="block text-xs font-medium text-gray-700 mb-1">To Date</label>
               <input
                 type="date"
                 value={filters.date_to || ''}
                 onChange={(e) => setFilters({ ...filters, date_to: e.target.value || undefined })}
-                className="px-3 py-2 border rounded-lg w-full text-sm"
+                className="px-2 py-1.5 border rounded w-full text-xs"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">User / Email</label>
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-xs font-medium text-gray-700 mb-1">User / Email</label>
               <input
                 type="text"
                 value={filters.user_search || ''}
                 onChange={(e) => setFilters({ ...filters, user_search: e.target.value?.trim() ? e.target.value : undefined })}
                 placeholder="Name or email"
-                className="px-3 py-2 border rounded-lg w-full text-sm"
+                className="px-2 py-1.5 border rounded w-full text-xs"
               />
             </div>
-            <div className="flex items-end">
-              <Button onClick={load} className="w-full" size="sm">Refresh</Button>
+            <div className="flex items-end col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-1">
+              <Button onClick={load} className="w-full text-xs px-2 py-1.5" size="sm">Refresh</Button>
             </div>
           </div>
-          <div className="mt-2 text-[10px] text-gray-500">Auto-refresh every 60s. Latest bookings appear at top.</div>
+          <div className="mt-2 text-[9px] text-gray-500">Auto-refresh every 60s. Latest bookings appear at top.</div>
         </CardContent>
       </Card>
 
@@ -596,28 +644,31 @@ const BookingsManagementPage: React.FC = () => {
           {loading ? (
             <div className="flex justify-center py-8"><LoadingSpinner /></div>
           ) : (
-            <div className="overflow-x-auto overflow-y-visible">
+            <div className="overflow-x-auto overflow-y-visible -mx-2 sm:mx-0">
               <Table
               data={paginatedBookings}
               keyExtractor={(b) => b.id.toString()}
+              className="min-w-full"
               columns={[
                 { 
                   key: 'booking_reference', 
-                  title: 'Ref#',
+                  title: 'Reference',
+                  className: 'w-[14%]',
                   render: (v: string) => (
                     <div className="text-xs font-mono">{v}</div>
                   )
                 },
                 { 
                   key: 'customer', 
-                  title: 'Customer', 
+                  title: 'Customer',
+                  className: 'w-[18%]',
                   render: (_: any, r: BookingDetails) => (
                     <div className="min-w-0">
-                      <div className="font-medium text-sm truncate">{`${r.first_name} ${r.last_name}`}</div>
+                      <div className="font-medium text-xs truncate">{`${r.first_name} ${r.last_name}`}</div>
                       <div className="text-xs text-gray-500 truncate">{r.email}</div>
                       {r.notes && (
-                        <div className="text-xs text-blue-600 mt-1 truncate" title={r.notes}>
-                          📝 {r.notes.length > 20 ? r.notes.substring(0, 20) + '...' : r.notes}
+                        <div className="text-xs text-blue-600 mt-0.5 truncate" title={r.notes}>
+                          📝 {r.notes.length > 10 ? r.notes.substring(0, 10) + '...' : r.notes}
                         </div>
                       )}
                     </div>
@@ -626,22 +677,25 @@ const BookingsManagementPage: React.FC = () => {
                 { 
                   key: 'field_name', 
                   title: 'Field',
+                  className: 'w-[10%]',
                   render: (v: string) => (
-                    <div className="text-sm truncate max-w-[120px]" title={v}>{v}</div>
+                    <div className="text-xs truncate" title={v}>{v}</div>
                   )
                 },
                 { 
                   key: 'booking_date', 
                   title: 'Date',
+                  className: 'w-[7%]',
                   render: (v: string) => (
-                    <div className="text-xs">{v}</div>
+                    <div className="text-xs">{v?.slice(5) || v}</div>
                   )
                 },
                 { 
                   key: 'time_slot', 
                   title: 'Time',
+                  className: 'w-[8%]',
                   render: (_: any, r: BookingDetails) => (
-                    <div className="text-xs">
+                    <div className="text-xs leading-tight">
                       <div>{r.start_time.slice(0, 5)}</div>
                       <div className="text-gray-500">{r.end_time.slice(0, 5)}</div>
                     </div>
@@ -649,16 +703,16 @@ const BookingsManagementPage: React.FC = () => {
                 },
                 { 
                   key: 'total_amount', 
-                  title: 'Amount', 
+                  title: 'Amount',
+                  className: 'w-[9%]',
                   render: (_: any, r: BookingDetails) => {
                     const displayAmount = getRefundAdjustedAmount(r);
-                    const refundDue = getExplicitRefundAmount(r);
                     return (
-                      <div className="text-sm font-medium">
-                        {formatCurrency(Math.abs(displayAmount))}
+                      <div className="text-xs font-medium">
+                        <div>{formatCurrency(Math.abs(displayAmount))}</div>
                         {displayAmount < 0 && (
-                          <span className="block text-[11px] text-red-600">
-                            Refund{refundDue ? ` (${formatCurrency(refundDue)})` : ''}
+                          <span className="block text-xs text-red-600 leading-tight">
+                            Refund
                           </span>
                         )}
                       </div>
@@ -668,8 +722,9 @@ const BookingsManagementPage: React.FC = () => {
                 { 
                   key: 'status', 
                   title: 'Status',
+                  className: 'w-[11%]',
                   render: (v: string) => (
-                    <span className={`px-2 py-1 text-xs rounded-full ${
+                    <span className={`px-1.5 py-0.5 text-xs rounded-full ${
                       v === 'confirmed' ? 'bg-green-100 text-green-800' :
                       v === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                       v === 'completed' ? 'bg-blue-100 text-blue-800' :
@@ -683,8 +738,9 @@ const BookingsManagementPage: React.FC = () => {
                 { 
                   key: 'payment_status', 
                   title: 'Payment',
+                  className: 'w-[11%]',
                   render: (v: string) => (
-                    <span className={`px-2 py-1 text-xs rounded-full ${
+                    <span className={`px-1.5 py-0.5 text-xs rounded-full ${
                       v === 'paid' ? 'bg-green-100 text-green-800' :
                       v === 'pending' ? 'bg-yellow-100 text-yellow-800' :
                       v === 'manual_pending' ? 'bg-blue-100 text-blue-800' :
@@ -698,11 +754,12 @@ const BookingsManagementPage: React.FC = () => {
                 },
                 {
                   key: 'actions',
-                  title: 'Actions',
+                  title: 'Action',
+                  className: 'w-[13%]',
                   render: (_: any, row: BookingDetails) => (
                     <div className="relative">
                       <button 
-                        className="px-2 py-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+                        className="p-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
                         onClick={(e: React.MouseEvent) => {
                           e.stopPropagation();
                           setOpenDropdown(openDropdown === row.id ? null : row.id);
@@ -831,105 +888,46 @@ const BookingsManagementPage: React.FC = () => {
                                       setOpenDropdown(null);
                                       return;
                                     }
-                                    // Prevent duplicate clicks
                                     if (processingPayment === row.id) return;
-                                    
+
                                     try {
                                       setProcessingPayment(row.id);
-                                      // Dismiss any existing toasts to prevent duplicates
                                       toast.dismiss();
-                                      console.log('Processing payment for booking:', row.id);
-                                      
-                                      // Use the /payments/process API to mark payment as processed
-                                      const paymentResponse = await paymentService.processPayment({
-                                        booking_id: row.id,
-                                        payment_method: row.payment_status === 'manual_pending' ? 'eft' : 'cash',
-                                        notes: `Payment manually confirmed by admin - ${row.payment_status === 'manual_pending' ? 'Manual payment processed' : 'Direct payment confirmation'}`
-                                      });
-                                      console.log('Payment response:', paymentResponse);
-                                      
-                                      // Update booking status to confirmed after payment
-                                      if (row.status === 'pending') {
-                                        await adminService.updateBookingStatus({ 
-                                          booking_id: row.id, 
-                                          status: 'confirmed' 
-                                        });
-                                      }
-                                      
-                                      // Update local state immediately to reflect changes
-                                      setBookings(prev => prev.map(booking => 
-                                        booking.id === row.id 
-                                          ? { 
-                                              ...booking, 
-                                              payment_status: 'paid',
-                                              status: booking.status === 'pending' ? 'confirmed' : booking.status
-                                            }
-                                          : booking
-                                      ));
-                                      
-                                      toast.success(`${row.payment_status === 'manual_pending' ? 'Manual payment' : 'Payment'} confirmed and booking updated`);
-                                      
-                                      // Fetch fresh booking data from backend to get authoritative payment status
-                                      try {
-                                        const freshBooking = await adminService.getBookingById(row.id);
-                                        console.log('Fresh booking from backend after payment:', freshBooking);
-                                        
-                                        // Update local state with fresh data from backend
-                                        setBookings(prev => prev.map(booking => 
-                                          booking.id === row.id ? freshBooking : booking
-                                        ));
-                                      } catch (e) {
-                                        console.error('Failed to fetch fresh booking, relying on optimistic update:', e);
-                                        // Continue with optimistic update if fetch fails
-                                      }
-                                      
-                                      // Also do a full refresh after a short delay as fallback
-                                      setTimeout(() => load(), 2000);
-                                      
-                                    } catch (e: any) {
-                                      // Check if payment actually succeeded despite the error
-                                      const errorMessage = e?.response?.data?.message || e?.message || '';
-                                      
-                                      if (errorMessage.toLowerCase().includes('already paid') || 
-                                          errorMessage.toLowerCase().includes('already processed')) {
-                                        // If already paid, update UI to show paid status
-                                        setBookings(prev => prev.map(booking => 
-                                          booking.id === row.id 
-                                            ? { 
-                                                ...booking, 
-                                                payment_status: 'paid',
-                                                status: booking.status === 'pending' ? 'confirmed' : booking.status
-                                              }
-                                            : booking
-                                        ));
-                                        
-                                        // Prevent duplicate error messages within 3 seconds
-                                        const now = Date.now();
-                                        if (now - lastErrorTimeRef.current > 3000) {
-                                          toast.error('Booking is already paid');
-                                          lastErrorTimeRef.current = now;
+
+                                      if (row.payment_status === 'manual_pending') {
+                                        if (row.payment_id) {
+                                          await paymentService.confirmPayment(row.payment_id, row.id);
                                         }
                                       } else {
-                                        // For other errors (including network), assume payment might have worked
-                                        // Update UI optimistically
-                                        setBookings(prev => prev.map(booking => 
-                                          booking.id === row.id 
-                                            ? { 
-                                                ...booking, 
-                                                payment_status: 'paid',
-                                                status: booking.status === 'pending' ? 'confirmed' : booking.status
-                                              }
-                                            : booking
-                                        ));
-                                        toast.success('Payment processed successfully');
-                                        
-                                        // Refresh after longer delay to confirm status
-                                        setTimeout(() => load(), 5000);
+                                        await adminService.markBookingAsPaid(row.id);
+                                      }
+
+                                      if (row.status === 'pending') {
+                                        await adminService.updateBookingStatus({
+                                          booking_id: row.id,
+                                          status: 'confirmed',
+                                        });
+                                      }
+
+                                      toast.success(`${row.payment_status === 'manual_pending' ? 'Manual payment' : 'Payment'} recorded successfully`);
+                                      await load();
+                                    } catch (e: any) {
+                                      const errorMessage = (e?.response?.data?.message || e?.message || '').toString();
+                                      const lower = errorMessage.toLowerCase();
+
+                                      if (lower.includes('already paid') || lower.includes('already processed')) {
+                                        toast.success('Booking payment already captured');
+                                        await load();
+                                      } else {
+                                        const now = Date.now();
+                                        if (now - lastErrorTimeRef.current > 3000) {
+                                          toast.error(errorMessage || 'Failed to update payment status');
+                                          lastErrorTimeRef.current = now;
+                                        }
                                       }
                                     } finally {
                                       setProcessingPayment(null);
                                       setOpenDropdown(null);
-                                      // No automatic refresh in finally - only refresh on success or after longer delay
                                     }
                                   }}
                                   disabled={processingPayment === row.id}
@@ -969,17 +967,17 @@ const BookingsManagementPage: React.FC = () => {
           )}
 
           {/* Pagination */}
-          <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="text-sm text-gray-600">
+          <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <div className="text-xs sm:text-sm text-gray-600">
               Showing {displayStart}-{displayEnd} of {totalItems} bookings
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end sm:gap-4">
-              <label className="flex items-center gap-2 text-sm text-gray-600">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
+              <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
                 Rows per page:
                 <select
                   value={itemsPerPage}
                   onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                  className="border rounded px-2 py-1 text-sm"
+                  className="border rounded px-1 py-0.5 text-xs sm:text-sm"
                 >
                   {PAGE_SIZE_OPTIONS.map((option) => (
                     <option key={option} value={option}>
@@ -988,23 +986,24 @@ const BookingsManagementPage: React.FC = () => {
                   ))}
                 </select>
               </label>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-1 sm:space-x-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => goToPage(currentPage - 1)}
                   disabled={currentPage === 1}
+                  className="text-xs px-2 py-1"
                 >
                   Previous
                 </Button>
                 <div className="flex items-center space-x-1">
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    const page = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                  {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                    const page = Math.max(1, Math.min(totalPages - 2, currentPage - 1)) + i;
                     return (
                       <button
                         key={page}
                         onClick={() => goToPage(page)}
-                        className={`px-3 py-1 rounded text-sm ${
+                        className={`px-2 py-1 rounded text-xs sm:text-sm ${
                           currentPage === page
                             ? 'bg-primary-600 text-white'
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -1020,6 +1019,7 @@ const BookingsManagementPage: React.FC = () => {
                   size="sm"
                   onClick={() => goToPage(currentPage + 1)}
                   disabled={currentPage === totalPages || totalItems === 0}
+                  className="text-xs px-2 py-1"
                 >
                   Next
                 </Button>

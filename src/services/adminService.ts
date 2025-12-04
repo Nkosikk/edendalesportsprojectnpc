@@ -434,10 +434,58 @@ export const adminService = {
   /**
    * Mark a booking as paid manually
    */
-  markBookingAsPaid: async (bookingId: string): Promise<void> => {
-    console.log('AdminService: Marking booking as paid, ID:', bookingId);
-    const response = await apiClient.post(`/admin/bookings/${bookingId}/mark-paid`);
-    console.log('AdminService: Mark as paid response:', response.data);
+  markBookingAsPaid: async (bookingId: number): Promise<void> => {
+    const normalizedId = Number(bookingId);
+    if (!Number.isFinite(normalizedId) || normalizedId <= 0) {
+      throw new Error('A valid booking ID is required to mark as paid.');
+    }
+
+    // Pull the current admin context if available so the backend can audit who performed the action
+    let activeUser: any = null;
+    try {
+      const rawUser = localStorage.getItem('user');
+      activeUser = rawUser ? JSON.parse(rawUser) : null;
+    } catch (error) {
+      console.warn('adminService.markBookingAsPaid: Unable to parse stored user context', error);
+    }
+
+    const timestamp = new Date().toISOString();
+    const actorNameParts: string[] = [];
+    if (activeUser?.first_name || activeUser?.user?.first_name) {
+      actorNameParts.push(activeUser?.first_name ?? activeUser?.user?.first_name);
+    }
+    if (activeUser?.last_name || activeUser?.user?.last_name) {
+      actorNameParts.push(activeUser?.last_name ?? activeUser?.user?.last_name);
+    }
+
+    const noteSegments = [
+      'Payment manually confirmed by admin',
+      actorNameParts.join(' ').trim() ? `(${actorNameParts.join(' ').trim()})` : '',
+      `on ${timestamp}`,
+    ].filter(Boolean);
+
+    try {
+      await paymentService.processPayment({
+        booking_id: normalizedId,
+        payment_method: 'cash',
+        notes: noteSegments.join(' '),
+      });
+      return;
+    } catch (err: any) {
+      const status = err?.response?.status;
+      const message = (err?.response?.data?.message || err?.message || '').toLowerCase();
+      if (
+        status === 409 ||
+        message.includes('already processed') ||
+        message.includes('already paid') ||
+        message.includes('exists')
+      ) {
+        // Booking already has a processed payment; treat as success.
+        return;
+      }
+
+      throw err;
+    }
   },
 
   /**

@@ -26,7 +26,7 @@ const ReportsRevenuePage: React.FC = () => {
   useEffect(() => { load(); }, [filters]);
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 max-w-screen-xl">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Revenue Report</h1>
       </div>

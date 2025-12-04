@@ -42,7 +42,7 @@ const BookingOverviewPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-8">
+    <div className="container mx-auto px-4 py-8 space-y-8 max-w-screen-xl">
       <div className="flex flex-col md:flex-row md:items-end gap-4 justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Booking Overview</h1>

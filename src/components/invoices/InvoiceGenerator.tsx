@@ -54,93 +54,95 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
   const displayAmount = Math.abs(lineAmount);
   const refundDue = getExplicitRefundAmount(booking);
   const invoiceTotals = invoiceService.calculateInvoiceTotals(displayAmount, 0);
+  const paymentStatusMap: Record<string, { label: string; dotClass: 'paid' | 'pending' | 'unpaid'; textClass: 'paid' | 'pending' | 'unpaid'; cardModifier?: 'status-paid' | 'status-pending' | 'status-unpaid'; }> = {
+    paid: { label: 'PAID', dotClass: 'paid', textClass: 'paid', cardModifier: 'status-paid' },
+    pending: { label: 'PAYMENT DUE', dotClass: 'pending', textClass: 'pending', cardModifier: 'status-pending' },
+    unpaid: { label: 'UNPAID', dotClass: 'unpaid', textClass: 'unpaid', cardModifier: 'status-unpaid' },
+    cancelled: { label: 'CANCELLED', dotClass: 'unpaid', textClass: 'unpaid', cardModifier: 'status-unpaid' },
+    refunded: { label: 'REFUNDED', dotClass: 'paid', textClass: 'paid', cardModifier: 'status-paid' }
+  };
+  const paymentStatusKey = (invoiceData.payment_status || 'pending').toLowerCase();
+  const paymentStatus = paymentStatusMap[paymentStatusKey] || paymentStatusMap.pending;
+  const paymentStatusCardClass = paymentStatus.cardModifier ? ` ${paymentStatus.cardModifier}` : '';
 
   return (
-    <div className="max-w-4xl mx-auto bg-white p-8 shadow-lg" id="invoice-content">
+    <div className="max-w-4xl mx-auto bg-white p-2 shadow-lg invoice-container" id="invoice-content">
       {/* Header */}
-      <div className="flex justify-between items-start mb-8">
-        <div className="flex items-start space-x-4">
+      <div className="flex justify-between items-start mb-2 pb-1 border-b-2 border-primary-500 invoice-header">
+        <div className="flex items-center space-x-1 invoice-header-left">
           {/* Logo */}
           <div className="flex-shrink-0">
             <img 
               src="/images/ESP-BLUE-2.png" 
               alt="Edendale Sports Complex Logo"
-              className="w-16 h-16 object-contain"
+              className="w-5 h-5 object-contain invoice-logo"
             />
           </div>
           {/* Company Info */}
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">{invoiceData.companyInfo.name}</h1>
-            <div className="text-sm text-gray-600 mt-2">
-              <p>{invoiceData.companyInfo.address}</p>
-              <p>Phone: {invoiceData.companyInfo.phone}</p>
-              <p>Email: {invoiceData.companyInfo.email}</p>
-              {invoiceData.companyInfo.website && <p>Web: {invoiceData.companyInfo.website}</p>}
+          <div className="invoice-company">
+            <h1 className="text-sm font-bold text-gray-900 invoice-company-name">{invoiceData.companyInfo.name}</h1>
+            <div className="text-xs text-gray-600 invoice-company-meta">
+              <p>{invoiceData.companyInfo.address} • {invoiceData.companyInfo.phone} • {invoiceData.companyInfo.email}</p>
             </div>
           </div>
         </div>
-        <div className="text-right">
-          <h2 className="text-2xl font-bold text-primary-600">INVOICE</h2>
-          <div className="text-sm text-gray-600 mt-2">
-            <p><span className="font-medium">Invoice #:</span> {invoiceData.invoiceNumber}</p>
-            <p><span className="font-medium">Issue Date:</span> {formatDate(invoiceData.issueDate)}</p>
-            {invoiceData.dueDate && (
-              <p><span className="font-medium">Due Date:</span> {formatDate(invoiceData.dueDate)}</p>
-            )}
-            <p><span className="font-medium">Booking Ref:</span> {invoiceData.booking_reference}</p>
+        <div className="text-right invoice-header-right">
+          <div className="bg-primary-50 px-2 py-0 rounded invoice-badge">
+            <h2 className="text-sm font-bold text-primary-700 invoice-header-title">INVOICE</h2>
+          </div>
+          <div className="text-xs text-gray-600 mt-0 invoice-header-meta">
+            <p><span className="font-semibold">Invoice #:</span> {invoiceData.invoiceNumber}</p>
+            <p><span className="font-semibold">Date:</span> {formatDate(invoiceData.issueDate)}</p>
+            <p><span className="font-semibold">Ref:</span> {invoiceData.booking_reference}</p>
           </div>
         </div>
       </div>
 
       {/* Bill To */}
-      <div className="mb-8">
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Bill To:</h3>
-        <div className="text-sm text-gray-700">
-          <p className="font-medium">{invoiceData.first_name} {invoiceData.last_name}</p>
-          <p>{invoiceData.email}</p>
-          {invoiceData.phone && <p>{invoiceData.phone}</p>}
+      <div className="mb-1 invoice-section invoice-section-billto">
+        <h3 className="text-xs font-semibold text-gray-900 mb-0 text-primary-700 invoice-section-title">Bill To:</h3>
+        <div className="bg-gray-50 p-1 rounded text-xs invoice-section-body">
+          <p className="font-semibold text-gray-900">{invoiceData.first_name} {invoiceData.last_name}</p>
+          <p className="text-gray-600">{invoiceData.email}{invoiceData.phone && ` • ${invoiceData.phone}`}</p>
         </div>
       </div>
 
       {/* Invoice Details */}
-      <div className="mb-8">
-        <table className="w-full border-collapse border border-gray-300">
+      <div className="mb-1 invoice-section invoice-details-section">
+        <h3 className="text-xs font-semibold text-primary-700 mb-0 invoice-section-title">Booking Details</h3>
+        <table className="w-full border-collapse bg-white shadow-sm rounded overflow-hidden text-xs invoice-table">
           <thead>
-            <tr className="bg-gray-50">
-              <th className="border border-gray-300 px-4 py-2 text-left">Description</th>
-              <th className="border border-gray-300 px-4 py-2 text-center">Date</th>
-              <th className="border border-gray-300 px-4 py-2 text-center">Time</th>
-              <th className="border border-gray-300 px-4 py-2 text-center">Duration</th>
-              <th className="border border-gray-300 px-4 py-2 text-right">Rate/Hour</th>
-              <th className="border border-gray-300 px-4 py-2 text-right">Amount</th>
+            <tr className="bg-primary-600 text-white">
+              <th className="px-1 py-0 text-left font-semibold">Description</th>
+              <th className="px-1 py-0 text-center font-semibold">Date</th>
+              <th className="px-1 py-0 text-center font-semibold">Time</th>
+              <th className="px-1 py-0 text-center font-semibold">Hrs</th>
+              <th className="px-1 py-0 text-right font-semibold">Rate</th>
+              <th className="px-1 py-0 text-right font-semibold">Total</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td className="border border-gray-300 px-4 py-2">
-                <div className="font-medium">{invoiceData.field_name}</div>
+            <tr className="border-b border-gray-200">
+              <td className="px-1 py-0">
+                <div className="font-semibold text-gray-900">{invoiceData.field_name}</div>
                 <div className="text-xs text-gray-600 capitalize">
-                  {invoiceData.sport_type.replace('_', ' ')} Field Booking
+                  {invoiceData.sport_type.replace('_', ' ')} Field
                 </div>
-                {invoiceData.notes && (
-                  <div className="text-xs text-gray-600 mt-1">
-                    <strong>Notes:</strong> {invoiceData.notes}
-                  </div>
-                )}
               </td>
-              <td className="border border-gray-300 px-4 py-2 text-center">
+              <td className="px-1 py-0 text-center text-gray-900">
                 {formatDate(invoiceData.booking_date)}
               </td>
-              <td className="border border-gray-300 px-4 py-2 text-center">
-                {formatTime(invoiceData.start_time)} - {formatTime(invoiceData.end_time)}
+              <td className="px-1 py-0 text-center text-gray-900">
+                <div className="font-medium">{formatTime(invoiceData.start_time)}</div>
+                <div className="text-xs text-gray-600">to {formatTime(invoiceData.end_time)}</div>
               </td>
-              <td className="border border-gray-300 px-4 py-2 text-center">
-                {invoiceData.duration_hours}h
+              <td className="px-1 py-0 text-center font-semibold text-gray-900">
+                {invoiceData.duration_hours}
               </td>
-              <td className="border border-gray-300 px-4 py-2 text-right">
+              <td className="px-1 py-0 text-right text-gray-900">
                 {formatCurrency(invoiceData.hourly_rate)}
               </td>
-              <td className="border border-gray-300 px-4 py-2 text-right">
+              <td className="px-1 py-0 text-right font-bold text-primary-700">
                 {formatCurrency(displayAmount)}
               </td>
             </tr>
@@ -149,89 +151,76 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
       </div>
 
       {/* Totals */}
-      <div className="flex justify-end mb-8">
-        <div className="w-64">
-          <div className="flex justify-between py-2 border-b border-gray-300">
-            <span className="font-medium">Subtotal:</span>
-            <span>{formatCurrency(invoiceTotals.subtotal)}</span>
-          </div>
-          <div className="flex justify-between py-2 border-b border-gray-300">
-            <span className="font-medium">VAT (0%):</span>
-            <span>{formatCurrency(invoiceTotals.vat)}</span>
-          </div>
-          <div className="flex justify-between py-3 text-lg font-bold border-b-2 border-gray-900">
-            <span>Total:</span>
-            <span>{formatCurrency(invoiceTotals.total)}</span>
-          </div>
-          {lineAmount < 0 && (
-            <p className="text-xs text-red-600 font-semibold mt-2">
-              Refund owed {refundDue ? `(${formatCurrency(refundDue)})` : ''}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Payment Status */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between bg-gray-50 p-4 rounded">
-          <div>
-            <h4 className="font-semibold text-gray-900">Payment Status</h4>
-            <p className="text-sm text-gray-600">
-              Status: <span className={`font-medium ${
-                invoiceData.payment_status === 'paid' ? 'text-green-600' :
-                invoiceData.payment_status === 'pending' ? 'text-yellow-600' :
-                'text-red-600'
-              }`}>
-                {invoiceData.payment_status?.toUpperCase() || 'PENDING'}
-              </span>
-            </p>
-            {invoiceData.payment_method && (
-              <p className="text-sm text-gray-600">
-                Method: <span className="font-medium">{invoiceData.payment_method.toUpperCase()}</span>
-              </p>
+      <div className="flex justify-end mb-1 invoice-totals">
+        <div className="w-40 bg-gray-50 p-1 rounded text-xs invoice-totals-box">
+          <div className="space-y-0">
+            <div className="flex justify-between text-gray-700 invoice-totals-row">
+              <span>Subtotal:</span>
+              <span className="font-medium">{formatCurrency(invoiceTotals.subtotal)}</span>
+            </div>
+            <div className="flex justify-between text-gray-700 invoice-totals-row">
+              <span>VAT (0%):</span>
+              <span className="font-medium">{formatCurrency(invoiceTotals.vat)}</span>
+            </div>
+            <div className="border-t border-gray-300 pt-0 mt-0">
+              <div className="flex justify-between text-xs font-bold text-gray-900 invoice-totals-total">
+                <span>Total:</span>
+                <span className="text-primary-700">{formatCurrency(invoiceTotals.total)}</span>
+              </div>
+            </div>
+            {lineAmount < 0 && (
+              <div className="bg-red-100 p-1 rounded text-xs refund-card">
+                <p className="text-red-800 font-semibold">
+                  Refund: {refundDue ? formatCurrency(refundDue) : formatCurrency(Math.abs(lineAmount))}
+                </p>
+              </div>
             )}
           </div>
-          <div className={`px-4 py-2 rounded-full text-sm font-medium ${
-            invoiceData.payment_status === 'paid' ? 'bg-green-100 text-green-800' :
-            invoiceData.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-            'bg-red-100 text-red-800'
-          }`}>
-            {invoiceData.payment_status === 'paid' ? 'PAID' : 
-             invoiceData.payment_status === 'pending' ? 'PAYMENT DUE' : 'UNPAID'}
-          </div>
         </div>
       </div>
 
-      {/* Payment Instructions */}
-      {lineAmount < 0 && (
-        <div className="mb-8 bg-red-50 p-4 rounded">
-          <h4 className="font-semibold text-red-900 mb-2">Refund Notice</h4>
-          <p className="text-sm text-red-800">
-            A refund of {refundDue ? formatCurrency(refundDue) : formatCurrency(Math.abs(lineAmount))} is owed to the customer. Our finance
-            team will process this shortly.
-          </p>
-        </div>
-      )}
-
-      {invoiceData.payment_status !== 'paid' && lineAmount >= 0 && (
-        <div className="mb-8 bg-blue-50 p-4 rounded">
-          <h4 className="font-semibold text-gray-900 mb-2">Payment Instructions</h4>
-          <div className="text-sm text-gray-700 space-y-1">
-            <p><strong>Online Payment:</strong> Visit our website and use booking reference: {invoiceData.booking_reference}</p>
-            <p><strong>Bank Transfer:</strong> Standard Bank - Account: 123456789 - Reference: {invoiceData.booking_reference}</p>
-            <p><strong>Cash/Card:</strong> Pay at reception during facility operating hours</p>
-            <p className="text-xs mt-2 text-gray-600">
-              Please include your booking reference ({invoiceData.booking_reference}) with all payments.
-            </p>
+      {/* Payment Information */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-1 mb-1 invoice-payment">
+        {/* Payment Status */}
+        <div className={`bg-white border border-gray-200 rounded p-1 invoice-payment-card payment-status-card${paymentStatusCardClass}`}>
+          <h4 className="font-semibold text-gray-900 mb-0 text-xs">Payment Status</h4>
+          <div className="payment-status-chip">
+            <span className={`payment-status-dot ${paymentStatus.dotClass}`}></span>
+            <span className={`payment-status-text ${paymentStatus.textClass}`}>{paymentStatus.label}</span>
+            {invoiceData.payment_method && (
+              <span className="payment-method">• Method: <span className="capitalize">{invoiceData.payment_method}</span></span>
+            )}
           </div>
         </div>
-      )}
+
+        {/* Payment Instructions or Notice */}
+        {lineAmount < 0 ? (
+          <div className="invoice-payment-card refund-card">
+            <h4 className="font-semibold mb-0 text-xs">Refund Notice</h4>
+            <p className="text-xs">
+              Refund <span className="font-bold">{refundDue ? formatCurrency(refundDue) : formatCurrency(Math.abs(lineAmount))}</span> processing 3-5 days.
+            </p>
+          </div>
+        ) : invoiceData.payment_status !== 'paid' ? (
+          <div className="invoice-payment-card payment-instructions-card">
+            <h4 className="font-semibold mb-0 text-xs">Payment Options</h4>
+            <p className="text-xs">
+              <span className="font-semibold">Online:</span> {invoiceData.booking_reference} • <span className="font-semibold">Bank:</span> 123456789 • <span className="font-semibold">Cash/Card</span> at reception
+            </p>
+          </div>
+        ) : (
+          <div className="invoice-payment-card payment-complete-card">
+            <h4 className="font-semibold mb-0 text-xs">Payment Complete</h4>
+            <p className="text-xs">
+              Payment processed successfully.
+            </p>
+          </div>
+        )}
+      </div>
 
       {/* Footer */}
-      <div className="text-center text-xs text-gray-500 border-t border-gray-200 pt-4">
-        <p>Thank you for choosing {invoiceData.companyInfo.name}</p>
-        <p>For any queries regarding this invoice, please contact us at {invoiceData.companyInfo.email}</p>
-        <p className="mt-2">Generated on {formatDate(new Date().toISOString().split('T')[0])}</p>
+      <div className="text-center border-t border-gray-200 pt-0 invoice-footer">
+        <p className="text-primary-900 font-medium text-xs">Thank you for choosing {invoiceData.companyInfo.name}!</p>
       </div>
     </div>
   );

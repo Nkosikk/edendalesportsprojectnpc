@@ -135,6 +135,47 @@ const FieldAvailabilityPage: React.FC = () => {
         </CardContent>
       </Card>
 
+      {/* Field Information */}
+      {selectedFieldId && (() => {
+        const selectedField = fields.find(f => f.id === Number(selectedFieldId));
+        return selectedField ? (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle>Field Information</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">{selectedField.name}</h4>
+                  <p className="text-sm text-gray-600">Sport: {selectedField.sport_type}</p>
+                  <p className="text-sm text-gray-600">Capacity: {selectedField.capacity} people</p>
+                  <p className="text-sm text-gray-600">Rate: R{Number(selectedField.hourly_rate || 0).toFixed(2)}/hour</p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Facilities</h4>
+                  <p className="text-sm text-gray-600">{selectedField.facilities || 'No facilities listed'}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Rules & Guidelines</h4>
+                  <div className="text-sm text-gray-600">
+                    {selectedField.rules ? (
+                      <div className="whitespace-pre-line bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <div className="flex items-start gap-2">
+                          <span className="text-yellow-600 mt-0.5">⚠️</span>
+                          <div>{selectedField.rules}</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 italic">No specific rules listed</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ) : null;
+      })()}
+
       <Card>
         <CardHeader>
           <CardTitle>Available Slots</CardTitle>

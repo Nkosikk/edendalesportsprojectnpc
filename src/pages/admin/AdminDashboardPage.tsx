@@ -1,23 +1,44 @@
 import React, { useEffect, useState } from 'react';
 import { TrendingUp } from 'lucide-react';
-import BookingOverview from '../../components/admin/BookingOverview';
+import { useNavigate } from 'react-router-dom';
+import BookingOverview, { type BookingOverviewMetrics } from '../../components/admin/BookingOverview';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { Badge, getStatusBadgeVariant } from '../../components/ui/Badge';
 import { Table } from '../../components/ui/Table';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { adminService } from '../../services/adminService';
-import type { DashboardData, BookingDetails } from '../../types';
+import type { DashboardData, BookingDetails, AdminBookingFilters } from '../../types';
 import { formatCurrency } from '../../lib/utils';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
 const AdminDashboardPage: React.FC = () => {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [dateRange, setDateRange] = useState({
     from: '',
     to: '',
   });
+
+  const metricNavigation: Partial<Record<keyof BookingOverviewMetrics, { path: string; state?: { filters?: Partial<AdminBookingFilters> } }>> = {
+    total_revenue: { path: '/admin/reports/revenue' },
+    total_bookings: { path: '/admin/bookings', state: { filters: { status: undefined, payment_status: undefined, field_id: undefined } } },
+    confirmed_bookings: { path: '/admin/bookings', state: { filters: { status: 'confirmed', payment_status: undefined } } },
+    pending_payments: { path: '/admin/bookings', state: { filters: { payment_status: 'pending', status: undefined } } },
+    total_hours: { path: '/admin/reports/analytics' },
+    total_users: { path: '/admin/users' },
+  };
+
+  const handleMetricClick = (metric: keyof BookingOverviewMetrics) => {
+    const destination = metricNavigation[metric];
+    if (!destination) return;
+    if (destination.state) {
+      navigate(destination.path, { state: destination.state });
+    } else {
+      navigate(destination.path);
+    }
+  };
 
   useEffect(() => {
     fetchDashboard();
@@ -67,32 +88,39 @@ const AdminDashboardPage: React.FC = () => {
     {
       key: 'booking_reference',
       title: 'Reference',
+      className: 'w-[18%]',
       render: (value: string) => (
-        <span className="font-mono text-sm">{value}</span>
+        <span className="font-mono text-xs truncate block">{value}</span>
       ),
     },
     {
       key: 'first_name',
       title: 'Customer',
+      className: 'w-[22%]',
       render: (_: any, row: BookingDetails) => (
-        <div>
-          <div className="font-medium">{`${row.first_name} ${row.last_name}`}</div>
-          <div className="text-sm text-gray-500">{row.email}</div>
+        <div className="min-w-0">
+          <div className="font-medium text-xs truncate">{`${row.first_name} ${row.last_name}`}</div>
+          <div className="text-xs text-gray-500 truncate">{row.email}</div>
         </div>
       ),
     },
     {
       key: 'field_name',
       title: 'Field',
+      className: 'w-[10%]',
+      render: (value: string) => (
+        <span className="text-xs truncate block">{value}</span>
+      ),
     },
     {
       key: 'booking_date',
       title: 'Date & Time',
+      className: 'w-[18%]',
       render: (_: any, row: BookingDetails) => (
-        <div>
-          <div>{format(new Date(row.booking_date), 'MMM dd, yyyy')}</div>
-          <div className="text-sm text-gray-500">
-            {row.start_time} - {row.end_time}
+        <div className="min-w-0">
+          <div className="text-xs">{format(new Date(row.booking_date), 'MMM dd, yyyy')}</div>
+          <div className="text-xs text-gray-500 truncate">
+            {row.start_time?.slice(0,5)} - {row.end_time?.slice(0,5)}
           </div>
         </div>
       ),
@@ -100,10 +128,11 @@ const AdminDashboardPage: React.FC = () => {
     {
       key: 'total_amount',
       title: 'Amount',
+      className: 'w-[12%]',
       render: (value: any) => {
         const num = Number(value);
         return (
-          <span className="font-semibold">
+          <span className="font-semibold text-xs">
             {Number.isFinite(num) ? formatCurrency(num) : '—'}
           </span>
         );
@@ -112,8 +141,9 @@ const AdminDashboardPage: React.FC = () => {
     {
       key: 'status',
       title: 'Status',
+      className: 'w-[10%]',
       render: (value: string) => (
-        <Badge variant={getStatusBadgeVariant(value)}>
+        <Badge variant={getStatusBadgeVariant(value)} className="text-xs px-1 py-0.5">
           {value.toUpperCase()}
         </Badge>
       ),
@@ -121,8 +151,9 @@ const AdminDashboardPage: React.FC = () => {
     {
       key: 'payment_status',
       title: 'Payment',
+      className: 'w-[10%]',
       render: (value: string) => (
-        <Badge variant={getStatusBadgeVariant(value)}>
+        <Badge variant={getStatusBadgeVariant(value)} className="text-xs px-1 py-0.5">
           {value.toUpperCase()}
         </Badge>
       ),
@@ -130,57 +161,57 @@ const AdminDashboardPage: React.FC = () => {
   ];
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="w-full px-2 sm:px-3 py-2 sm:py-4 max-w-screen-xl mx-auto">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Admin Dashboard</h1>
-        <p className="text-gray-600">Manage bookings, users, and track revenue</p>
+      <div className="mb-4">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">Admin Dashboard</h1>
+        <p className="text-sm text-gray-600">Manage bookings, users, and track revenue</p>
       </div>
 
       {/* Date Range Filter */}
-      <Card className="mb-6">
-        <CardContent className="py-4">
-          <div className="flex flex-wrap items-end gap-4">
+      <Card className="mb-4">
+        <CardContent className="py-3">
+          <div className="flex flex-wrap items-end gap-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
                 From Date
               </label>
               <input
                 type="date"
                 value={dateRange.from}
                 onChange={(e) => setDateRange({ ...dateRange, from: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
                 To Date
               </label>
               <input
                 type="date"
                 value={dateRange.to}
                 onChange={(e) => setDateRange({ ...dateRange, to: e.target.value })}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                className="px-2 py-1.5 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-green-500"
               />
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <div className="mb-8">
-        <BookingOverview metrics={overviewMetrics} />
+      <div className="mb-4">
+        <BookingOverview metrics={overviewMetrics} onMetricClick={handleMetricClick} />
       </div>
 
       {/* Revenue Chart */}
       {dashboard.daily_revenue.length > 0 && (
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
+        <Card className="mb-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <TrendingUp className="h-4 w-4" />
               Daily Revenue
             </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-0">
             <div className="space-y-3">
               {dashboard.daily_revenue.slice(0, 10).map((day, index) => (
                 <div key={index} className="flex items-center justify-between">
@@ -190,10 +221,10 @@ const AdminDashboardPage: React.FC = () => {
                     </span>
                     <div className="flex-1">
                       <div
-                        className="bg-green-500 h-6 rounded"
+                        className="bg-green-500 h-4 rounded"
                         style={{
                           width: `${(day.revenue / Math.max(...dashboard.daily_revenue.map(d => d.revenue))) * 100}%`,
-                          minWidth: '20px',
+                          minWidth: '16px',
                         }}
                       />
                     </div>
@@ -215,10 +246,10 @@ const AdminDashboardPage: React.FC = () => {
 
       {/* Recent Bookings */}
       <Card>
-        <CardHeader>
-          <CardTitle>Recent Bookings</CardTitle>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Recent Bookings</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-0">
           <Table
             data={dashboard.recent_bookings}
             columns={bookingColumns}

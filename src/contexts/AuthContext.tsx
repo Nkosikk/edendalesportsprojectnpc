@@ -41,14 +41,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
       if (storedUser && accessToken) {
         try {
-          setUser(JSON.parse(storedUser));
+          const userData = JSON.parse(storedUser);
+          setUser(userData);
           // Optionally verify token is still valid
           await apiClient.get('/auth/verify');
         } catch (error) {
-          // Token invalid, clear storage
+          // Token invalid, clear storage and user state
           localStorage.removeItem('user');
           localStorage.removeItem('accessToken');
-          // no refresh token in current API
+          setUser(null);
         }
       }
       setLoading(false);
@@ -97,8 +98,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
       }
     } catch (error: any) {
-      const message = error.response?.data?.message || 'Login failed';
-      toast.error(message);
+      const message = error.response?.data?.message || error.message || 'Login failed';
+      // Only show toast if not already shown by interceptor
+      if (!(error as any)._toastShown) {
+        toast.error(message);
+      }
       throw error;
     } finally {
       setLoading(false);
@@ -128,11 +132,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           const booking = JSON.parse(pendingBooking);
           // Clear the pending booking
           localStorage.removeItem('pendingBooking');
-          // Navigate to booking creation with stored params
-          const url = `/app/bookings/new?field_id=${booking.field_id}&date=${booking.date}&start_time=${booking.start_time}&end_time=${booking.end_time}`;
-          window.location.href = url;
+          // Longer delay for new registrations to ensure profile is ready
+          setTimeout(() => {
+            const url = `/app/bookings/new?field_id=${booking.field_id}&date=${booking.date}&start_time=${booking.start_time}&end_time=${booking.end_time}`;
+            window.location.href = url;
+          }, 300);
         } catch (e) {
           console.warn('Failed to parse pending booking:', e);
+          localStorage.removeItem('pendingBooking');
         }
       }
     } catch (error: any) {
