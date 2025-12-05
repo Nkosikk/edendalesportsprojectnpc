@@ -433,6 +433,9 @@ const BookingsPage = () => {
                   <p className="text-green-800">
                     Send proof of payment to: <strong>edendale@gmail.com</strong>
                   </p>
+                  <p className="text-green-800 mt-2">
+                    Prefer cash? You can also pay at the field on arrival—bring your booking reference along.
+                  </p>
                 </div>
 
                 <div className="bg-gray-50 p-4 rounded-lg">
