@@ -160,6 +160,55 @@ const AdminDashboardPage: React.FC = () => {
     },
   ];
 
+  const renderMobileBookingCard = (booking: BookingDetails) => {
+    return (
+      <div key={booking.id} className="border rounded-lg p-3 bg-white shadow-sm">
+        <div className="flex justify-between items-start mb-2">
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-gray-500">Reference</div>
+            <div className="text-xs font-mono text-gray-900">{booking.booking_reference}</div>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <Badge variant={getStatusBadgeVariant(booking.status)} className="text-[10px] px-1.5 py-0.5">
+              {booking.status.toUpperCase()}
+            </Badge>
+            <Badge variant={getStatusBadgeVariant(booking.payment_status)} className="text-[10px] px-1.5 py-0.5">
+              {booking.payment_status.toUpperCase()}
+            </Badge>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 text-[11px] text-gray-700">
+          <div>
+            <div className="text-[9px] uppercase tracking-wide text-gray-500">Customer</div>
+            <div className="font-medium text-gray-900 truncate">{`${booking.first_name} ${booking.last_name}`}</div>
+            <div className="text-[10px] text-gray-500 truncate">{booking.email}</div>
+          </div>
+          <div>
+            <div className="text-[9px] uppercase tracking-wide text-gray-500">Field</div>
+            <div className="text-gray-900 truncate" title={booking.field_name}>{booking.field_name}</div>
+          </div>
+          <div>
+            <div className="text-[9px] uppercase tracking-wide text-gray-500">Date</div>
+            <div className="text-gray-900" title={booking.booking_date}>
+              {format(new Date(booking.booking_date), 'MMM dd, yyyy')}
+            </div>
+          </div>
+          <div>
+            <div className="text-[9px] uppercase tracking-wide text-gray-500">Time</div>
+            <div className="text-gray-900">
+              {booking.start_time?.slice(0, 5)} - {booking.end_time?.slice(0, 5)}
+            </div>
+          </div>
+          <div>
+            <div className="text-[9px] uppercase tracking-wide text-gray-500">Amount</div>
+            <div className="font-semibold text-gray-900">{formatCurrency(Number(booking.total_amount) || 0)}</div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="w-full px-2 sm:px-3 py-2 sm:py-4 max-w-screen-xl mx-auto">
       {/* Header */}
@@ -250,12 +299,23 @@ const AdminDashboardPage: React.FC = () => {
           <CardTitle className="text-base">Recent Bookings</CardTitle>
         </CardHeader>
         <CardContent className="pt-0">
-          <Table
-            data={dashboard.recent_bookings}
-            columns={bookingColumns}
-            keyExtractor={(row) => row.id.toString()}
-            emptyMessage="No recent bookings"
-          />
+          {dashboard.recent_bookings.length === 0 ? (
+            <div className="py-6 text-center text-sm text-gray-500">No recent bookings</div>
+          ) : (
+            <>
+              <div className="md:hidden space-y-3">
+                {dashboard.recent_bookings.map((booking) => renderMobileBookingCard(booking))}
+              </div>
+              <div className="hidden md:block">
+                <Table
+                  data={dashboard.recent_bookings}
+                  columns={bookingColumns}
+                  keyExtractor={(row) => row.id.toString()}
+                  emptyMessage="No recent bookings"
+                />
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>
