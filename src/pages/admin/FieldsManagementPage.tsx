@@ -268,15 +268,12 @@ const FieldsManagementPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="mt-3 flex gap-2">
-        <Button size="sm" variant="outline" onClick={() => setEditing(field)} className="flex-1 text-xs">
-          Edit
-        </Button>
+      <div className="mt-3">
         <Button
           size="sm"
           variant={field.is_active ? 'secondary' : 'primary'}
           onClick={() => toggleActive(field)}
-          className="flex-1 text-xs"
+          className="w-full text-xs"
         >
           {field.is_active ? 'Deactivate' : 'Activate'}
         </Button>
@@ -421,14 +418,14 @@ const FieldsManagementPage: React.FC = () => {
                     title: 'Actions',
                     className: 'w-[15%]',
                     render: (_: any, row: SportsField) => (
-                      <div className="flex gap-1">
-                        <Button size="sm" variant="outline" onClick={() => setEditing(row)} className="text-xs px-2 py-1">
-                          Edit
-                        </Button>
-                        <Button size="sm" variant={row.is_active ? 'secondary' : 'primary'} onClick={() => toggleActive(row)} className="text-xs px-2 py-1">
-                          {row.is_active ? 'Deactivate' : 'Activate'}
-                        </Button>
-                      </div>
+                      <Button
+                        size="sm"
+                        variant={row.is_active ? 'secondary' : 'primary'}
+                        onClick={() => toggleActive(row)}
+                        className="text-xs px-3 py-1"
+                      >
+                        {row.is_active ? 'Deactivate' : 'Activate'}
+                      </Button>
                     )
                   }
                 ]}
