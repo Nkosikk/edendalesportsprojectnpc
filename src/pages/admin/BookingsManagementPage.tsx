@@ -1,14 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { adminService } from '../../services/adminService';
-import { paymentService } from '../../services/paymentService';
+
 import { fieldService } from '../../services/fieldsService';
+import { paymentService } from '../../services/paymentService';
 import { bookingService } from '../../services/bookingService';
 import type { BookingDetails, AdminBookingFilters, UpdateBookingStatusRequest, SportsField } from '../../types';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
 import { Table } from '../../components/ui/Table';
-import { formatCurrency, getRefundAdjustedAmount, getExplicitRefundAmount } from '../../lib/utils';
+import { formatCurrency, getRefundAdjustedAmount } from '../../lib/utils';
 import { Card, CardContent } from '../../components/ui/Card';
 import InvoiceModal from '../../components/invoices/InvoiceModal';
 import { Modal } from '../../components/ui/Modal';
@@ -53,8 +54,10 @@ const BookingsManagementPage: React.FC = () => {
   const [selectedBookingForInvoice, setSelectedBookingForInvoice] = useState<BookingDetails | null>(null);
   const [openDropdown, setOpenDropdown] = useState<number | null>(null);
   const [processingPayment, setProcessingPayment] = useState<number | null>(null);
+
   const [fieldOptions, setFieldOptions] = useState<SportsField[]>([]);
   const [fieldsLoading, setFieldsLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const [statusModal, setStatusModal] = useState<{
     booking: BookingDetails | null;
     status: UpdateBookingStatusRequest['status'];
@@ -62,23 +65,10 @@ const BookingsManagementPage: React.FC = () => {
     refund: string;
     submitting: boolean;
   }>({ booking: null, status: 'pending', reason: '', refund: '', submitting: false });
-  const [emailModal, setEmailModal] = useState<{
-    booking: BookingDetails | null;
-    email: string;
-    subject: string;
-    message: string;
-    includePaymentLink: boolean;
-    sending: boolean;
-  }>({ booking: null, email: '', subject: '', message: '', includePaymentLink: true, sending: false });
-  const [refundModal, setRefundModal] = useState<{
-    booking: BookingDetails | null;
-    amount: string;
-    reason: string;
-    submitting: boolean;
-  }>({ booking: null, amount: '', reason: '', submitting: false });
-  const lastErrorTimeRef = React.useRef<number>(0);
+
   // Keep track of rows we already auto-completed to avoid duplicate updates
   const autoCompletedRef = React.useRef<Set<number>>(new Set());
+  const lastErrorTimeRef = React.useRef<number>(0);
   const autoAttemptedRef = React.useRef<Set<number>>(new Set());
 
   useEffect(() => {
@@ -146,14 +136,14 @@ const BookingsManagementPage: React.FC = () => {
       );
       console.log('BookingsManagementPage: Clean filters:', cleanFilters);
       const backendFilters: Record<string, any> = { ...cleanFilters };
-      const searchTerm = (cleanFilters.user_search as string | undefined)?.trim();
-      if (searchTerm) {
-        backendFilters.user_search = searchTerm;
-        backendFilters.search = searchTerm;
-        backendFilters.field_name = searchTerm;
-        backendFilters.field = searchTerm;
-        backendFilters.reference = searchTerm;
-        backendFilters.booking_reference = searchTerm;
+      const userSearchTerm = (cleanFilters.user_search as string | undefined)?.trim();
+      if (userSearchTerm) {
+        backendFilters.user_search = userSearchTerm;
+        backendFilters.search = userSearchTerm;
+        backendFilters.field_name = userSearchTerm;
+        backendFilters.field = userSearchTerm;
+        backendFilters.reference = userSearchTerm;
+        backendFilters.booking_reference = userSearchTerm;
       }
       if (cleanFilters.date_from) {
         backendFilters.from_date = cleanFilters.date_from;
@@ -191,7 +181,7 @@ const BookingsManagementPage: React.FC = () => {
         return true;
       });
 
-      const searchFiltered = searchTerm
+      const searchFiltered = userSearchTerm
         ? withinRange.filter((booking) => {
             const haystack = [
               booking.first_name,
@@ -203,7 +193,7 @@ const BookingsManagementPage: React.FC = () => {
               .filter(Boolean)
               .join(' ')
               .toLowerCase();
-            return haystack.includes(searchTerm.toLowerCase());
+            return haystack.includes(userSearchTerm.toLowerCase());
           })
         : withinRange;
 
@@ -237,6 +227,11 @@ const BookingsManagementPage: React.FC = () => {
     }
     setCurrentPage(1);
   }, [itemsPerPage]);
+
+  // Reset to first page when search term changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
 
   useEffect(() => {
     const fetchFields = async () => {
@@ -316,19 +311,9 @@ const BookingsManagementPage: React.FC = () => {
     setStatusModal((prev) => ({ ...prev, booking: null, reason: '', refund: '', submitting: false }));
   };
 
-  const openRefundModal = (booking: BookingDetails) => {
-    const suggested = getExplicitRefundAmount(booking) ?? booking.refund_amount ?? booking.total_amount ?? 0;
-    setRefundModal({
-      booking,
-      amount: suggested ? String(Math.abs(suggested)) : '',
-      reason: '',
-      submitting: false,
-    });
-  };
 
-  const closeRefundModal = () => {
-    setRefundModal({ booking: null, amount: '', reason: '', submitting: false });
-  };
+
+
 
   const handleStatusModalSubmit = async () => {
     if (!statusModal.booking) return;
@@ -368,52 +353,38 @@ const BookingsManagementPage: React.FC = () => {
     }
   };
 
-  const openEmailModal = (booking: BookingDetails) => {
-    setEmailModal({
-      booking,
-      email: booking.email,
-      subject: `Invoice for booking ${booking.booking_reference}`,
-      message: `Hi ${booking.first_name},\n\nPlease find your invoice for ${booking.field_name} on ${booking.booking_date}.\n\nThank you,\nEdendale Sports Projects`,
-      includePaymentLink: true,
-      sending: false,
+  // Search and pagination calculations
+  const normalizedSearch = searchTerm.trim().toLowerCase();
+  const filteredBySearch = React.useMemo(() => {
+    if (!normalizedSearch) {
+      return bookings;
+    }
+    return bookings.filter((booking) => {
+      const haystack = [
+        booking.booking_reference,
+        booking.first_name,
+        booking.last_name,
+        booking.email,
+        booking.field_name,
+        booking.status,
+        booking.payment_status,
+        booking.notes,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(normalizedSearch);
     });
-  };
+  }, [bookings, normalizedSearch]);
 
-  const closeEmailModal = () => {
-    setEmailModal((prev) => ({
-      ...prev,
-      booking: null,
-      sending: false,
-      email: '',
-      subject: '',
-      message: '',
-    }));
-  };
-
-  const handleSendInvoice = async () => {
-    if (!emailModal.booking) return;
-    if (!emailModal.email) {
-      toast.error('Recipient email is required');
-      return;
-    }
-    try {
-      setEmailModal((prev) => ({ ...prev, sending: true }));
-      toast('Invoice emailing is coming soon.');
-      closeEmailModal();
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to email invoice');
-      setEmailModal((prev) => ({ ...prev, sending: false }));
-    }
-  };
-
-  // Pagination calculations
-  const totalItems = bookings.length;
+  const totalItems = filteredBySearch.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / itemsPerPage) || 1);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedBookings = bookings.slice(startIndex, endIndex);
+  const paginatedBookings = filteredBySearch.slice(startIndex, endIndex);
   const displayStart = totalItems === 0 ? 0 : startIndex + 1;
   const displayEnd = totalItems === 0 ? 0 : Math.min(endIndex, totalItems);
+  const hasSingleResult = !loading && totalItems === 1;
 
   const goToPage = (page: number) => {
     setCurrentPage(Math.min(Math.max(1, page), totalPages));
@@ -452,6 +423,296 @@ const BookingsManagementPage: React.FC = () => {
     link.click();
     window.URL.revokeObjectURL(url);
     toast.success('CSV exported successfully');
+  };
+
+  // Helper functions for rendering status badges
+  const renderStatusBadge = (status: string) => (
+    <span className={`px-1.5 py-0.5 text-xs rounded-full ${
+      status === 'confirmed' ? 'bg-green-100 text-green-800' :
+      status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+      status === 'completed' ? 'bg-blue-100 text-blue-800' :
+      status === 'cancelled' ? 'bg-red-100 text-red-800' :
+      'bg-gray-100 text-gray-800'
+    }`}>
+      {status}
+    </span>
+  );
+
+  const renderPaymentBadge = (paymentStatus: string) => (
+    <span className={`px-1.5 py-0.5 text-xs rounded-full ${
+      paymentStatus === 'paid' ? 'bg-green-100 text-green-800' :
+      paymentStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+      paymentStatus === 'manual_pending' ? 'bg-blue-100 text-blue-800' :
+      paymentStatus === 'failed' ? 'bg-red-100 text-red-800' :
+      paymentStatus === 'refunded' ? 'bg-gray-100 text-gray-800' :
+      'bg-gray-100 text-gray-800'
+    }`}>
+      {paymentStatus === 'manual_pending' ? 'Manual' : paymentStatus}
+    </span>
+  );
+
+  // Render action menu with smart positioning
+  const renderActionMenu = (booking: BookingDetails, options: { forceAbove?: boolean } = {}) => {
+    const dropdownClasses = options.forceAbove 
+      ? "absolute right-0 bottom-full mb-1 bg-white border rounded-lg shadow-xl z-[9999] min-w-[160px] max-h-96 overflow-y-auto"
+      : "absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-xl z-[9999] min-w-[160px] max-h-96 overflow-y-auto";
+
+    return (
+      <div className="relative">
+        <button 
+          className="p-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
+          onClick={(e: React.MouseEvent) => {
+            e.stopPropagation();
+            setOpenDropdown(openDropdown === booking.id ? null : booking.id);
+          }}
+        >
+          <MoreVertical className="h-4 w-4" />
+        </button>
+        
+        {openDropdown === booking.id && (
+          <div className={dropdownClasses} style={{ zIndex: 9999 }}>
+            <div className="py-0">
+              {/* View Details */}
+              <button
+                onClick={() => {
+                  window.open(`/app/bookings/${booking.id}`, '_blank');
+                  setOpenDropdown(null);
+                }}
+                className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+              >
+                <Eye className="h-4 w-4" />
+                View Details
+              </button>
+
+              {/* Edit Booking */}
+              {(booking.status === 'pending' || booking.status === 'confirmed') && (
+                <button
+                  onClick={() => {
+                    window.open(`/app/bookings/${booking.id}/edit`, '_blank');
+                    setOpenDropdown(null);
+                  }}
+                  className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+                >
+                  <Edit className="h-4 w-4" />
+                  Edit Booking
+                </button>
+              )}
+
+              {/* Invoice */}
+              <button
+                onClick={() => {
+                  setSelectedBookingForInvoice(booking);
+                  setOpenDropdown(null);
+                }}
+                className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                View Invoice
+              </button>
+              <div className="border-t my-1"></div>
+
+              {/* Status Actions */}
+              {booking.status === 'pending' && booking.payment_status === 'paid' && (
+                <button
+                  onClick={() => {
+                    openStatusModal(booking, 'confirmed');
+                    setOpenDropdown(null);
+                  }}
+                  className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-green-600"
+                >
+                  <Check className="h-4 w-4" />
+                  Confirm Booking
+                </button>
+              )}
+
+              {(booking.status === 'pending' || booking.status === 'confirmed') && (
+                <button
+                  onClick={() => {
+                    openStatusModal(booking, 'cancelled');
+                    setOpenDropdown(null);
+                  }}
+                  className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600"
+                >
+                  <X className="h-4 w-4" />
+                  Cancel Booking
+                </button>
+              )}
+
+              {/* Mark as Completed */}
+              {booking.status === 'confirmed' && booking.payment_status === 'paid' && (
+                <button
+                  onClick={async () => {
+                    try {
+                      await updateStatus(booking.id, 'completed');
+                      toast.success('Booking marked as completed');
+                    } catch (e: any) {
+                      toast.error(e?.response?.data?.message || e?.message || 'Failed to mark as completed');
+                    } finally {
+                      setOpenDropdown(null);
+                    }
+                  }}
+                  className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-blue-600"
+                >
+                  <Check className="h-4 w-4" />
+                  Mark as Completed
+                </button>
+              )}
+
+              {/* Payment Actions */}
+              {booking.status !== 'cancelled' && (booking.payment_status === 'pending' || booking.payment_status === 'manual_pending') && (
+                <>
+                  <div className="border-t my-1"></div>
+                  <button
+                    onClick={async () => {
+                      const confirmLabel = booking.payment_status === 'manual_pending'
+                        ? 'Confirm manual payment'
+                        : 'Mark this booking as paid';
+                      const confirmation = window.confirm(
+                        `${confirmLabel} for ${booking.booking_reference}? This action cannot be undone.`
+                      );
+                      if (!confirmation) {
+                        setOpenDropdown(null);
+                        return;
+                      }
+                      if (processingPayment === booking.id) return;
+                      try {
+                        setProcessingPayment(booking.id);
+                        toast.dismiss();
+
+                        if (booking.payment_status === 'manual_pending') {
+                          if (booking.payment_id) {
+                            await paymentService.confirmPayment(booking.payment_id, booking.id);
+                          }
+                        } else {
+                          await adminService.markBookingAsPaid(booking.id);
+                        }
+
+                        if (booking.status === 'pending') {
+                          await adminService.updateBookingStatus({
+                            booking_id: booking.id,
+                            status: 'confirmed',
+                          });
+                        }
+
+                        toast.success(`${booking.payment_status === 'manual_pending' ? 'Manual payment' : 'Payment'} recorded successfully`);
+                        await load();
+                      } catch (e: any) {
+                        const errorMessage = (e?.response?.data?.message || e?.message || '').toString();
+                        const lower = errorMessage.toLowerCase();
+                        if (lower.includes('already paid') || lower.includes('already processed')) {
+                          toast.success('Booking payment already captured');
+                          await load();
+                        } else {
+                          const now = Date.now();
+                          if (now - lastErrorTimeRef.current > 3000) {
+                            toast.error(errorMessage || 'Failed to update payment status');
+                            lastErrorTimeRef.current = now;
+                          }
+                        }
+                      } finally {
+                        setProcessingPayment(null);
+                        setOpenDropdown(null);
+                      }
+                    }}
+                    disabled={processingPayment === booking.id}
+                    className={`w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-green-600 ${
+                      processingPayment === booking.id ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    <DollarSign className="h-4 w-4" />
+                    {booking.payment_status === 'manual_pending' ? 'Confirm Manual Payment' : 'Mark as Paid'}
+                  </button>
+                </>
+              )}
+
+              {/* Mark Refunded (when cancelled and not yet refunded) */}
+              {booking.status === 'cancelled' && booking.payment_status !== 'refunded' &&
+                booking.payment_status !== 'pending' &&
+                booking.payment_status !== 'manual_pending' && (
+                <>
+                  <div className="border-t my-1"></div>
+                  <button
+                    onClick={() => {
+                      // In historical version this opened a refund modal; here we directly invoke service
+                      (async () => {
+                        try {
+                          const amount = typeof booking.refund_amount === 'number' ? booking.refund_amount : undefined;
+                          await adminService.markBookingRefunded({ booking_id: booking.id, amount });
+                          toast.success('Refund marked as processed');
+                          await load();
+                        } catch (e: any) {
+                          toast.error(e?.response?.data?.message || e?.message || 'Failed to mark refund');
+                        } finally {
+                          setOpenDropdown(null);
+                        }
+                      })();
+                    }}
+                    className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-purple-600"
+                  >
+                    <DollarSign className="h-4 w-4" />
+                    Mark Refunded
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Mobile booking card component
+  const renderMobileBookingCard = (booking: BookingDetails, options: { forceAbove?: boolean } = {}) => {
+    const adjustedAmount = getRefundAdjustedAmount(booking);
+    const amountLabel = formatCurrency(Math.abs(adjustedAmount));
+
+    return (
+      <div key={booking.id} className="bg-white border rounded-lg p-3 shadow-sm">
+        <div className="flex justify-between items-start mb-2">
+          <div className="text-xs font-mono text-gray-600">{booking.booking_reference}</div>
+          {renderActionMenu(booking, options)}
+        </div>
+
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-gray-500">Customer</div>
+          <div className="text-xs font-medium text-gray-900">{`${booking.first_name} ${booking.last_name}`}</div>
+          <div className="text-xs text-gray-600 break-all">{booking.email}</div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3 text-xs mt-2">
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-gray-500">Field</div>
+            <div className="text-gray-900" title={booking.field_name}>{booking.field_name}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-gray-500">Date</div>
+            <div className="text-gray-900">{booking.booking_date}</div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-gray-500">Time</div>
+            <div className="text-gray-900">
+              {booking.start_time.slice(0, 5)} - {booking.end_time.slice(0, 5)}
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wide text-gray-500">Amount</div>
+            <div className="font-semibold text-gray-900">{amountLabel}</div>
+            {adjustedAmount < 0 && <div className="text-[10px] text-red-600">Refund</div>}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mt-2">
+          {renderStatusBadge(booking.status)}
+          {renderPaymentBadge(booking.payment_status)}
+        </div>
+
+        {booking.notes && (
+          <div className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded mt-2">
+            📝 {booking.notes}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const exportToPDF = () => {
@@ -621,17 +882,17 @@ const BookingsManagementPage: React.FC = () => {
                 className="px-2 py-1.5 border rounded w-full text-xs"
               />
             </div>
-            <div className="col-span-2 sm:col-span-1">
-              <label className="block text-xs font-medium text-gray-700 mb-1">User / Email</label>
+            <div className="col-span-2 sm:col-span-2">
+              <label className="block text-xs font-medium text-gray-700 mb-1">Search</label>
               <input
-                type="text"
-                value={filters.user_search || ''}
-                onChange={(e) => setFilters({ ...filters, user_search: e.target.value?.trim() ? e.target.value : undefined })}
-                placeholder="Name or email"
+                type="search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Reference, customer, field..."
                 className="px-2 py-1.5 border rounded w-full text-xs"
               />
             </div>
-            <div className="flex items-end col-span-2 sm:col-span-3 md:col-span-4 lg:col-span-1">
+            <div className="flex items-end">
               <Button onClick={load} className="w-full text-xs px-2 py-1.5" size="sm">Refresh</Button>
             </div>
           </div>
@@ -640,16 +901,30 @@ const BookingsManagementPage: React.FC = () => {
       </Card>
 
       <Card>
-        <CardContent>
+        <CardContent className={hasSingleResult ? 'pb-2' : ''}>
+          <div className="mb-4 text-sm font-semibold text-gray-800">Bookings</div>
           {loading ? (
             <div className="flex justify-center py-8"><LoadingSpinner /></div>
+          ) : paginatedBookings.length === 0 ? (
+            <div className="py-12 text-center text-sm text-gray-500">
+              No bookings found for the selected filters.
+            </div>
           ) : (
-            <div className="overflow-x-auto overflow-y-visible -mx-2 sm:mx-0">
-              <Table
-              data={paginatedBookings}
-              keyExtractor={(b) => b.id.toString()}
-              className="min-w-full"
-              columns={[
+            <>
+              <div className="md:hidden space-y-3 -mx-1">
+                {paginatedBookings.map((booking, index) => {
+                  const isLast = index === paginatedBookings.length - 1;
+                  const shouldForceAbove = paginatedBookings.length > 1 && isLast;
+                  return renderMobileBookingCard(booking, { forceAbove: shouldForceAbove });
+                })}
+              </div>
+              <div className="hidden md:block">
+                <div className="overflow-x-auto overflow-y-visible -mx-2 sm:mx-0">
+                  <Table
+                    data={paginatedBookings}
+                    keyExtractor={(b) => b.id.toString()}
+                    className="min-w-full"
+                    columns={[
                 { 
                   key: 'booking_reference', 
                   title: 'Reference',
@@ -723,302 +998,85 @@ const BookingsManagementPage: React.FC = () => {
                   key: 'status', 
                   title: 'Status',
                   className: 'w-[11%]',
-                  render: (v: string) => (
-                    <span className={`px-1.5 py-0.5 text-xs rounded-full ${
-                      v === 'confirmed' ? 'bg-green-100 text-green-800' :
-                      v === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                      v === 'completed' ? 'bg-blue-100 text-blue-800' :
-                      v === 'cancelled' ? 'bg-red-100 text-red-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {v}
-                    </span>
-                  )
+                  render: (v: string) => renderStatusBadge(v)
                 },
                 { 
                   key: 'payment_status', 
                   title: 'Payment',
                   className: 'w-[11%]',
-                  render: (v: string) => (
-                    <span className={`px-1.5 py-0.5 text-xs rounded-full ${
-                      v === 'paid' ? 'bg-green-100 text-green-800' :
-                      v === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                      v === 'manual_pending' ? 'bg-blue-100 text-blue-800' :
-                      v === 'failed' ? 'bg-red-100 text-red-800' :
-                      v === 'refunded' ? 'bg-gray-100 text-gray-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {v === 'manual_pending' ? 'Manual' : v}
-                    </span>
-                  )
+                  render: (v: string) => renderPaymentBadge(v)
                 },
                 {
                   key: 'actions',
                   title: 'Action',
                   className: 'w-[13%]',
-                  render: (_: any, row: BookingDetails) => (
-                    <div className="relative">
-                      <button 
-                        className="p-1 text-sm border border-gray-300 rounded hover:bg-gray-50"
-                        onClick={(e: React.MouseEvent) => {
-                          e.stopPropagation();
-                          setOpenDropdown(openDropdown === row.id ? null : row.id);
-                        }}
-                      >
-                        <MoreVertical className="h-4 w-4" />
-                      </button>
-                      
-                      {openDropdown === row.id && (
-                        <div className="absolute right-0 top-full mt-1 bg-white border rounded-lg shadow-xl z-[9999] min-w-[160px] max-h-96 overflow-y-auto"
-                          style={{ zIndex: 9999 }}
-                        >
-                          <div className="py-0">
-                            {/* View Details */}
-                            <button
-                              onClick={() => {
-                                window.open(`/app/bookings/${row.id}`, '_blank');
-                                setOpenDropdown(null);
-                              }}
-                              className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                            >
-                              <Eye className="h-4 w-4" />
-                              View Details
-                            </button>
-
-                            {/* Edit Booking */}
-                            {(row.status === 'pending' || row.status === 'confirmed') && (
-                              <button
-                                onClick={() => {
-                                  window.open(`/app/bookings/${row.id}/edit`, '_blank');
-                                  setOpenDropdown(null);
-                                }}
-                                className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                              >
-                                <Edit className="h-4 w-4" />
-                                Edit Booking
-                              </button>
-                            )}
-
-                            {/* Invoice */}
-                            <button
-                              onClick={() => {
-                                setSelectedBookingForInvoice(row);
-                                setOpenDropdown(null);
-                              }}
-                              className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                            >
-                              <FileText className="h-4 w-4" />
-                              View Invoice
-                            </button>
-                            <button
-                              onClick={() => {
-                                openEmailModal(row);
-                                setOpenDropdown(null);
-                              }}
-                              className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2"
-                            >
-                              <FileText className="h-4 w-4" />
-                              Email Invoice
-                            </button>
-
-                            {/* Separator */}
-                            <div className="border-t my-1"></div>
-
-                            {/* Status Actions */}
-                            {row.status === 'pending' && (
-                              <button
-                                onClick={() => {
-                                  openStatusModal(row, 'confirmed');
-                                  setOpenDropdown(null);
-                                }}
-                                className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-green-600"
-                              >
-                                <Check className="h-4 w-4" />
-                                Confirm Booking
-                              </button>
-                            )}
-
-                            {row.status === 'confirmed' && (
-                              <button
-                                onClick={async () => {
-                                  setOpenDropdown(null);
-                                  try {
-                                    toast.loading('Marking booking as complete...', { id: 'complete-booking' });
-                                    await bookingService.markBookingComplete(row.id);
-                                    toast.success('Booking marked as complete', { id: 'complete-booking' });
-                                    load(); // Refresh the bookings list
-                                  } catch (e: any) {
-                                    const msg = e?.response?.data?.message || e?.message || 'Failed to mark booking as complete';
-                                    toast.error(msg, { id: 'complete-booking' });
-                                  }
-                                }}
-                                className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-blue-600"
-                              >
-                                <Check className="h-4 w-4" />
-                                Mark Complete
-                              </button>
-                            )}
-
-                            {(row.status === 'pending' || row.status === 'confirmed') && (
-                              <button
-                                onClick={() => {
-                                  openStatusModal(row, 'cancelled');
-                                  setOpenDropdown(null);
-                                }}
-                                className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-red-600"
-                              >
-                                <X className="h-4 w-4" />
-                                Cancel Booking
-                              </button>
-                            )}
-
-                            {/* Payment Actions */}
-                            {(row.payment_status === 'pending' || row.payment_status === 'manual_pending') && (
-                              <>
-                                <div className="border-t my-1"></div>
-                                <button
-                                  onClick={async () => {
-                                    const confirmLabel = row.payment_status === 'manual_pending'
-                                      ? 'Confirm manual payment'
-                                      : 'Mark this booking as paid';
-                                    const confirmation = window.confirm(
-                                      `${confirmLabel} for ${row.booking_reference}? This action cannot be undone.`
-                                    );
-                                    if (!confirmation) {
-                                      setOpenDropdown(null);
-                                      return;
-                                    }
-                                    if (processingPayment === row.id) return;
-
-                                    try {
-                                      setProcessingPayment(row.id);
-                                      toast.dismiss();
-
-                                      if (row.payment_status === 'manual_pending') {
-                                        if (row.payment_id) {
-                                          await paymentService.confirmPayment(row.payment_id, row.id);
-                                        }
-                                      } else {
-                                        await adminService.markBookingAsPaid(row.id);
-                                      }
-
-                                      if (row.status === 'pending') {
-                                        await adminService.updateBookingStatus({
-                                          booking_id: row.id,
-                                          status: 'confirmed',
-                                        });
-                                      }
-
-                                      toast.success(`${row.payment_status === 'manual_pending' ? 'Manual payment' : 'Payment'} recorded successfully`);
-                                      await load();
-                                    } catch (e: any) {
-                                      const errorMessage = (e?.response?.data?.message || e?.message || '').toString();
-                                      const lower = errorMessage.toLowerCase();
-
-                                      if (lower.includes('already paid') || lower.includes('already processed')) {
-                                        toast.success('Booking payment already captured');
-                                        await load();
-                                      } else {
-                                        const now = Date.now();
-                                        if (now - lastErrorTimeRef.current > 3000) {
-                                          toast.error(errorMessage || 'Failed to update payment status');
-                                          lastErrorTimeRef.current = now;
-                                        }
-                                      }
-                                    } finally {
-                                      setProcessingPayment(null);
-                                      setOpenDropdown(null);
-                                    }
-                                  }}
-                                  disabled={processingPayment === row.id}
-                                  className={`w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-green-600 ${
-                                    processingPayment === row.id ? 'opacity-50 cursor-not-allowed' : ''
-                                  }`}
-                                >
-                                  <DollarSign className="h-4 w-4" />
-                                  {row.payment_status === 'manual_pending' ? 'Confirm Manual Payment' : 'Mark as Paid'}
-                                </button>
-                              </>
-                            )}
-                            {row.status === 'cancelled' && row.payment_status !== 'refunded' && (
-                              <>
-                                <div className="border-t my-1"></div>
-                                <button
-                                  onClick={() => {
-                                    openRefundModal(row);
-                                    setOpenDropdown(null);
-                                  }}
-                                  className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-purple-600"
-                                >
-                                  <DollarSign className="h-4 w-4" />
-                                  Mark Refunded
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                },
+                  render: (_: any, row: BookingDetails, index: number) => 
+                    renderActionMenu(row, {
+                      forceAbove: paginatedBookings.length > 1 && index === paginatedBookings.length - 1
+                    })
+                }
               ]}
-            />
-            </div>
+                  />
+                </div>
+              </div>
+            </>
           )}
+        </CardContent>
+      </Card>
 
-          {/* Pagination */}
-          <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-            <div className="text-xs sm:text-sm text-gray-600">
-              Showing {displayStart}-{displayEnd} of {totalItems} bookings
+      {/* Pagination */}
+      <Card className={hasSingleResult ? 'mt-2' : 'mt-4'}>
+        <CardContent className="p-3">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="text-xs text-gray-600">
+              Showing {displayStart} to {displayEnd} of {totalItems} booking{totalItems !== 1 ? 's' : ''}
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end sm:gap-3">
-              <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-600">
-                Rows per page:
-                <select
-                  value={itemsPerPage}
-                  onChange={(e) => setItemsPerPage(Number(e.target.value))}
-                  className="border rounded px-1 py-0.5 text-xs sm:text-sm"
-                >
-                  {PAGE_SIZE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <div className="flex items-center space-x-1 sm:space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
+            
+            <div className="flex items-center gap-2">
+              <select 
+                value={itemsPerPage} 
+                onChange={(e) => setItemsPerPage(Number(e.target.value))}
+                className="px-2 py-1 border rounded text-xs"
+              >
+                {PAGE_SIZE_OPTIONS.map(size => (
+                  <option key={size} value={size}>{size} per page</option>
+                ))}
+              </select>
+              
+              <div className="flex gap-1">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
                   onClick={() => goToPage(currentPage - 1)}
-                  disabled={currentPage === 1}
+                  disabled={currentPage <= 1}
                   className="text-xs px-2 py-1"
                 >
                   Previous
                 </Button>
-                <div className="flex items-center space-x-1">
-                  {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
-                    const page = Math.max(1, Math.min(totalPages - 2, currentPage - 1)) + i;
+                
+                <div className="flex gap-1">
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    const page = i + 1;
                     return (
-                      <button
+                      <Button
                         key={page}
+                        variant={currentPage === page ? "default" : "outline"}
+                        size="sm"
                         onClick={() => goToPage(page)}
-                        className={`px-2 py-1 rounded text-xs sm:text-sm ${
-                          currentPage === page
-                            ? 'bg-primary-600 text-white'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
+                        className="text-xs px-2 py-1 min-w-[2rem]"
                       >
                         {page}
-                      </button>
+                      </Button>
                     );
                   })}
+                  {totalPages > 5 && <span className="text-xs text-gray-500 px-2">...</span>}
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
+                
+                <Button 
+                  variant="outline" 
+                  size="sm" 
                   onClick={() => goToPage(currentPage + 1)}
-                  disabled={currentPage === totalPages || totalItems === 0}
+                  disabled={currentPage >= totalPages}
                   className="text-xs px-2 py-1"
                 >
                   Next
@@ -1029,222 +1087,56 @@ const BookingsManagementPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Invoice Modal */}
+      {/* Modals */}
       {selectedBookingForInvoice && (
         <InvoiceModal
-          isOpen={!!selectedBookingForInvoice}
-          onClose={() => setSelectedBookingForInvoice(null)}
+          isOpen={true}
           booking={selectedBookingForInvoice}
+          onClose={() => setSelectedBookingForInvoice(null)}
         />
       )}
 
+      {/* Status Modal */}
       {statusModal.booking && (
         <Modal
           isOpen={!!statusModal.booking}
           onClose={closeStatusModal}
-          title={
-            statusModal.status === 'cancelled'
-              ? 'Cancel booking'
-              : statusModal.status === 'confirmed'
-              ? 'Confirm booking'
-              : 'Update booking status'
-          }
-          size="md"
-          footer={
-            <>
-              <Button variant="outline" onClick={closeStatusModal} disabled={statusModal.submitting}>
-                Close
-              </Button>
-              <Button onClick={handleStatusModalSubmit} loading={statusModal.submitting}>
-                Save
-              </Button>
-            </>
-          }
+          title={`${statusModal.status === 'confirmed' ? 'Confirm' : statusModal.status === 'cancelled' ? 'Cancel' : 'Update'} Booking`}
         >
-          <div className="space-y-4 text-sm">
-            <p className="text-gray-600">
-              {statusModal.status === 'cancelled'
-                ? 'Provide a reason for cancelling this booking. Customers will see this reason in their records.'
-                : 'Confirming the booking will lock in the selected slot for the customer.'}
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              {statusModal.status === 'confirmed' && 'Are you sure you want to confirm this booking?'}
+              {statusModal.status === 'cancelled' && 'Please provide a reason for cancelling this booking:'}
             </p>
-            <div className="bg-gray-50 border rounded p-3 text-xs text-gray-700">
-              <div className="font-semibold">{statusModal.booking.field_name}</div>
-              <div>Ref: {statusModal.booking.booking_reference}</div>
-              <div>Date: {statusModal.booking.booking_date}</div>
-              <div>Time: {statusModal.booking.start_time?.slice(0,5)} - {statusModal.booking.end_time?.slice(0,5)}</div>
-            </div>
-            {(statusModal.status === 'cancelled' || statusModal.status === 'confirmed') && (
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">
-                  Reason {statusModal.status === 'cancelled' ? '(required)' : '(optional)'}
-                </label>
-                <textarea
-                  value={statusModal.reason}
-                  onChange={(e) => setStatusModal((prev) => ({ ...prev, reason: e.target.value }))}
-                  rows={3}
-                  className="w-full border rounded px-3 py-2 text-sm"
-                  placeholder={statusModal.status === 'cancelled' ? 'Explain why this booking is being cancelled' : 'Add an internal note'}
-                />
-              </div>
-            )}
+            
             {statusModal.status === 'cancelled' && (
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1">Refund amount (optional)</label>
-                <input
-                  type="number"
-                  min={0}
-                  step={50}
-                  value={statusModal.refund}
-                  onChange={(e) => setStatusModal((prev) => ({ ...prev, refund: e.target.value }))}
-                  className="w-full border rounded px-3 py-2 text-sm"
-                  placeholder="0.00"
-                />
-              </div>
-            )}
-          </div>
-        </Modal>
-      )}
-
-      {emailModal.booking && (
-        <Modal
-          isOpen={!!emailModal.booking}
-          onClose={closeEmailModal}
-          title="Email Invoice"
-          size="md"
-          footer={
-            <>
-              <Button variant="outline" onClick={closeEmailModal} disabled={emailModal.sending}>
-                Close
-              </Button>
-              <Button onClick={handleSendInvoice} loading={emailModal.sending}>
-                Send Email
-              </Button>
-            </>
-          }
-        >
-          <div className="space-y-4 text-sm">
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Recipient</label>
-              <input
-                type="email"
-                value={emailModal.email}
-                onChange={(e) => setEmailModal((prev) => ({ ...prev, email: e.target.value }))}
-                className="w-full border rounded px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Subject</label>
-              <input
-                type="text"
-                value={emailModal.subject}
-                onChange={(e) => setEmailModal((prev) => ({ ...prev, subject: e.target.value }))}
-                className="w-full border rounded px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Message</label>
               <textarea
-                rows={4}
-                value={emailModal.message}
-                onChange={(e) => setEmailModal((prev) => ({ ...prev, message: e.target.value }))}
-                className="w-full border rounded px-3 py-2 text-sm"
-              />
-            </div>
-            <label className="flex items-center gap-2 text-xs font-semibold text-gray-700">
-              <input
-                type="checkbox"
-                checked={emailModal.includePaymentLink}
-                onChange={(e) => setEmailModal((prev) => ({ ...prev, includePaymentLink: e.target.checked }))}
-              />
-              Include payment link
-            </label>
-          </div>
-        </Modal>
-      )}
-
-      {refundModal.booking && (
-        <Modal
-          isOpen={!!refundModal.booking}
-          onClose={closeRefundModal}
-          title="Mark refund processed"
-          size="md"
-          footer={
-            <>
-              <Button variant="outline" onClick={closeRefundModal} disabled={refundModal.submitting}>
-                Close
-              </Button>
-              <Button
-                onClick={async () => {
-                  if (!refundModal.booking) return;
-                  const amountValue = refundModal.amount.trim() ? Number(refundModal.amount) : undefined;
-                  if (amountValue !== undefined && (Number.isNaN(amountValue) || amountValue < 0)) {
-                    toast.error('Refund amount must be zero or positive.');
-                    return;
-                  }
-                  try {
-                    setRefundModal((prev) => ({ ...prev, submitting: true }));
-                    await adminService.markBookingRefunded({
-                      booking_id: refundModal.booking.id,
-                      payment_id: refundModal.booking.payment_id ?? undefined,
-                      amount: amountValue,
-                      reason: refundModal.reason || 'Refund processed',
-                    });
-                    setBookings((prev) =>
-                      prev.map((b) =>
-                        b.id === refundModal.booking?.id
-                          ? { ...b, payment_status: 'refunded', refund_amount: amountValue ?? b.refund_amount }
-                          : b
-                      )
-                    );
-                    toast.success('Booking marked as refunded');
-                    closeRefundModal();
-                  } catch (error: any) {
-                    toast.error(error?.message || 'Failed to mark as refunded');
-                    setRefundModal((prev) => ({ ...prev, submitting: false }));
-                  }
-                }}
-                loading={refundModal.submitting}
-              >
-                Save
-              </Button>
-            </>
-          }
-        >
-          <div className="space-y-4 text-sm">
-            <p className="text-gray-600">
-              Record that the refund has been paid back to the customer. This updates the payment status to <strong>Refunded</strong> on the customer portal.
-            </p>
-            <div className="bg-gray-50 border rounded p-3 text-xs text-gray-700">
-              <div className="font-semibold">{refundModal.booking.field_name}</div>
-              <div>Ref: {refundModal.booking.booking_reference}</div>
-              <div>Date: {refundModal.booking.booking_date}</div>
-              <div>Customer: {refundModal.booking.first_name} {refundModal.booking.last_name}</div>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Refund amount (optional)</label>
-              <input
-                type="number"
-                min={0}
-                step={50}
-                value={refundModal.amount}
-                onChange={(e) => setRefundModal((prev) => ({ ...prev, amount: e.target.value }))}
-                className="w-full border rounded px-3 py-2 text-sm"
-                placeholder="0.00"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1">Reference / notes</label>
-              <textarea
+                value={statusModal.reason}
+                onChange={(e) => setStatusModal(prev => ({ ...prev, reason: e.target.value }))}
+                placeholder="Reason for cancellation..."
+                className="w-full px-3 py-2 border rounded-lg text-sm"
                 rows={3}
-                value={refundModal.reason}
-                onChange={(e) => setRefundModal((prev) => ({ ...prev, reason: e.target.value }))}
-                className="w-full border rounded px-3 py-2 text-sm"
-                placeholder="e.g. EFT refund processed on 24 Nov"
               />
+            )}
+            
+            <div className="flex gap-2 justify-end">
+              <Button variant="outline" onClick={closeStatusModal} disabled={statusModal.submitting}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleStatusModalSubmit}
+                disabled={statusModal.submitting}
+                className={statusModal.status === 'cancelled' ? 'bg-red-600 hover:bg-red-700' : ''}
+              >
+                {statusModal.submitting ? 'Processing...' : 
+                 statusModal.status === 'confirmed' ? 'Confirm Booking' : 
+                 statusModal.status === 'cancelled' ? 'Cancel Booking' : 'Update'}
+              </Button>
             </div>
           </div>
         </Modal>
       )}
+
     </div>
   );
 };
