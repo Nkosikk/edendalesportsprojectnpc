@@ -203,13 +203,13 @@ const UsersManagementPage: React.FC = () => {
 
       <Card className="mb-4">
         <CardContent>
-          <div className="flex gap-4 items-end">
-            <div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="w-full sm:w-auto sm:min-w-[140px]">
               <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
               <select
                 value={filters.role || ''}
                 onChange={(e) => setFilters({ ...filters, role: (e.target.value as any) || undefined })}
-                className="px-3 py-2 border rounded-lg"
+                className="w-full px-3 py-2 border rounded-lg"
               >
                 <option value="">All</option>
                 <option value="admin">Admin</option>
@@ -217,17 +217,19 @@ const UsersManagementPage: React.FC = () => {
                 <option value="customer">Customer</option>
               </select>
             </div>
-            <div>
+            <div className="w-full sm:flex-1">
               <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
               <input
                 type="text"
                 value={filters.search || ''}
                 onChange={(e) => setFilters({ ...filters, search: e.target.value || undefined })}
                 placeholder="Name or email"
-                className="px-3 py-2 border rounded-lg"
+                className="w-full px-3 py-2 border rounded-lg"
               />
             </div>
-            <Button onClick={load}>Refresh</Button>
+            <div className="w-full sm:w-auto">
+              <Button onClick={load} className="w-full">Refresh</Button>
+            </div>
           </div>
         </CardContent>
       </Card>
