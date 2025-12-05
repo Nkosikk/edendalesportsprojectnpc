@@ -239,6 +239,51 @@ const FieldsManagementPage: React.FC = () => {
     }
   };
 
+  const renderMobileFieldCard = (field: SportsField) => (
+    <div key={field.id} className="bg-white border rounded-lg p-3 shadow-sm">
+      <div className="flex justify-between items-start gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="text-[10px] uppercase tracking-wide text-gray-500">Field</div>
+          <div className="text-sm font-semibold text-gray-900 truncate">{field.name}</div>
+          <div className="text-xs text-gray-600 truncate">Type: {field.sport_type}</div>
+          <div className="text-[10px] text-gray-400">ID: {field.id}</div>
+        </div>
+        <span
+          className={`inline-flex items-center text-[10px] font-medium px-2 py-0.5 rounded-full ${
+            field.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+          }`}
+        >
+          {field.is_active ? 'Active' : 'Inactive'}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 text-xs text-gray-700 mt-3">
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-gray-500">Capacity</div>
+          <div className="mt-1 font-medium text-gray-900">{field.capacity}</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-wide text-gray-500">Rate</div>
+          <div className="mt-1 font-medium text-gray-900">R {Number(field.hourly_rate || 0).toFixed(2)}</div>
+        </div>
+      </div>
+
+      <div className="mt-3 flex gap-2">
+        <Button size="sm" variant="outline" onClick={() => setEditing(field)} className="flex-1 text-xs">
+          Edit
+        </Button>
+        <Button
+          size="sm"
+          variant={field.is_active ? 'secondary' : 'primary'}
+          onClick={() => toggleActive(field)}
+          className="flex-1 text-xs"
+        >
+          {field.is_active ? 'Deactivate' : 'Activate'}
+        </Button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="container mx-auto px-4 py-4 max-w-screen-xl">
       <div className="mb-4">
@@ -300,11 +345,11 @@ const FieldsManagementPage: React.FC = () => {
 
       <Card>
         <CardContent>
-          <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
-            <div className="flex items-center gap-2 text-xs">
+          <div className="flex flex-col gap-3 mb-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-col gap-2 text-xs sm:flex-row sm:items-center sm:gap-3">
               <span className="text-gray-700 font-medium">Total: {displayFields.length} fields</span>
               <select
-                className="input text-xs px-2 py-1"
+                className="input text-xs px-2 py-1 w-full sm:w-auto"
                 value={pageSize}
                 onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
               >
@@ -313,21 +358,23 @@ const FieldsManagementPage: React.FC = () => {
                 <option value={20}>20 per page</option>
               </select>
             </div>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="text-gray-700">Sort:</span>
+            <div className="flex flex-col gap-2 text-xs sm:flex-row sm:items-center sm:gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-gray-700">Sort:</span>
+                <select
+                  className="input text-xs px-2 py-1 w-full sm:w-auto"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                >
+                  <option value="name">Name</option>
+                  <option value="sport_type">Type</option>
+                  <option value="capacity">Capacity</option>
+                  <option value="hourly_rate">Rate</option>
+                  <option value="is_active">Active</option>
+                </select>
+              </div>
               <select
-                className="input text-xs px-2 py-1"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-              >
-                <option value="name">Name</option>
-                <option value="sport_type">Type</option>
-                <option value="capacity">Capacity</option>
-                <option value="hourly_rate">Rate</option>
-                <option value="is_active">Active</option>
-              </select>
-              <select
-                className="input text-xs px-2 py-1"
+                className="input text-xs px-2 py-1 w-full sm:w-auto"
                 value={sortDir}
                 onChange={(e) => setSortDir(e.target.value as any)}
               >
@@ -335,7 +382,13 @@ const FieldsManagementPage: React.FC = () => {
                 <option value="desc">↓</option>
               </select>
             </div>
-            <Button size="sm" variant="outline" onClick={load} disabled={loading} className="text-xs px-2 py-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={load}
+              disabled={loading}
+              className="text-xs px-2 py-1 w-full md:w-auto"
+            >
               {loading ? 'Loading...' : 'Refresh'}
             </Button>
           </div>
@@ -343,10 +396,14 @@ const FieldsManagementPage: React.FC = () => {
             <div className="flex justify-center py-8"><LoadingSpinner /></div>
           ) : (
             <div>
-              <Table
-                data={paginatedFields}
-                keyExtractor={(f) => f.id.toString()}
-                columns={[
+              <div className="md:hidden space-y-3 -mx-1">
+                {paginatedFields.map(renderMobileFieldCard)}
+              </div>
+              <div className="hidden md:block">
+                <Table
+                  data={paginatedFields}
+                  keyExtractor={(f) => f.id.toString()}
+                  columns={[
                   { key: 'id', title: 'ID', className: 'w-[8%]' },
                   { key: 'name', title: 'Name', className: 'w-[25%] truncate' },
                   { key: 'sport_type', title: 'Type', className: 'w-[15%] truncate' },
@@ -375,7 +432,8 @@ const FieldsManagementPage: React.FC = () => {
                     )
                   }
                 ]}
-              />
+                />
+              </div>
               
               {totalPages > 1 && (
                 <div className="flex items-center justify-between mt-3 px-2">
