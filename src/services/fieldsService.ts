@@ -202,7 +202,7 @@ export const fieldService = {
    */
   createField: async (data: CreateFieldRequest): Promise<SportsField> => {
     const response = await apiClient.post<ApiResponse<SportsField>>('/fields', data);
-    const created = handleApiResponse<any>(response, true);
+    const created = handleApiResponse<any>(response, false);
     return normalizeField(created?.field || created);
   },
 
@@ -211,7 +211,7 @@ export const fieldService = {
    */
   updateField: async (id: number, data: Partial<CreateFieldRequest>): Promise<SportsField> => {
     const response = await apiClient.put<ApiResponse<SportsField>>(`/fields/${id}`, data);
-    const updated = handleApiResponse<any>(response, true);
+    const updated = handleApiResponse<any>(response, false);
     return normalizeField(updated?.field || updated);
   },
 

@@ -110,11 +110,35 @@ const coerceTime = (time?: string | null) => {
   return time;
 };
 
+const parseDateAndTime = (date?: string | null, time?: string | null): Date | null => {
+  if (!date || !time) return null;
+  const trimmedTime = time.trim();
+
+  // Some backends return timestamps directly (e.g., "2025-12-07 10:00:00")
+  if (/^\d{4}-\d{2}-\d{2}/.test(trimmedTime)) {
+    const directCandidate = trimmedTime.includes('T') ? trimmedTime : trimmedTime.replace(' ', 'T');
+    const direct = new Date(directCandidate);
+    if (!isNaN(direct.getTime())) return direct;
+  }
+
+  const isoCandidate = `${date}T${coerceTime(trimmedTime)}`;
+  const parsed = new Date(isoCandidate);
+  if (!isNaN(parsed.getTime())) return parsed;
+
+  const fallback = new Date(`${date} ${trimmedTime}`);
+  return isNaN(fallback.getTime()) ? null : fallback;
+};
+
 const parseBookingDateTime = (booking?: Pick<BookingDetails, 'booking_date' | 'start_time'> | null) => {
   if (!booking?.booking_date || !booking?.start_time) return null;
-  const isoCandidate = `${booking.booking_date}T${coerceTime(booking.start_time)}`;
-  const parsed = new Date(isoCandidate);
-  return isNaN(parsed.getTime()) ? null : parsed;
+  const parsed = parseDateAndTime(booking.booking_date, booking.start_time);
+  return parsed;
+};
+
+const parseBookingEndDateTime = (booking?: Pick<BookingDetails, 'booking_date' | 'end_time'> | null) => {
+  if (!booking?.booking_date || !booking?.end_time) return null;
+  const parsed = parseDateAndTime(booking.booking_date, booking.end_time);
+  return parsed;
 };
 
 export const hoursUntilBookingStart = (
@@ -124,6 +148,14 @@ export const hoursUntilBookingStart = (
   if (!start) return null;
   const diffMs = start.getTime() - Date.now();
   return diffMs / (1000 * 60 * 60);
+};
+
+export const hasBookingEnded = (
+  booking?: Pick<BookingDetails, 'booking_date' | 'end_time'> | null
+): boolean => {
+  const end = parseBookingEndDateTime(booking);
+  if (!end) return false;
+  return end.getTime() <= Date.now();
 };
 
 const isPrivilegedRole = (role?: string | UserRole | null) => {
@@ -234,4 +266,11 @@ export const getRefundAdjustedAmount = (
   }
 
   return total;
+};
+
+export const shouldAutoCompleteBooking = (booking: BookingDetails | null | undefined): boolean => {
+  if (!booking) return false;
+  if (booking.status !== 'confirmed') return false;
+  if (booking.payment_status !== 'paid') return false;
+  return hasBookingEnded(booking);
 };

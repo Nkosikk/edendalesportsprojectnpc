@@ -15,6 +15,7 @@ import {
   canUserCancelBooking,
   getCancellationRestrictionMessage,
   getExplicitRefundAmount,
+  shouldAutoCompleteBooking,
 } from '../../lib/utils';
 import PayButton from '../../components/payments/PayButton';
 import { useAuth } from '../../contexts/AuthContext';
@@ -26,6 +27,11 @@ const BookingsPage = () => {
   const queryClient = useQueryClient();
   const cancellingRef = useRef<Set<number>>(new Set());
   const pollingRef = useRef<number | null>(null);
+  const autoCompletingRef = useRef<Set<number>>(new Set());
+
+  useEffect(() => {
+    autoCompletingRef.current.clear();
+  }, [user?.id]);
 
 
   const { data: bookings, isLoading, error, refetch } = useQuery<BookingDetails[]>(
@@ -152,6 +158,49 @@ const BookingsPage = () => {
     }
     return bookings;
   }, [bookings, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const normalizedRole = String(user.role || '').toLowerCase();
+    const isPrivileged = normalizedRole === 'admin' || normalizedRole === 'staff';
+    if (!isPrivileged) return;
+
+    const list = visibleBookings || [];
+    if (list.length === 0) return;
+
+    const completions: Array<Promise<void>> = [];
+
+    list.forEach((booking) => {
+      if (!shouldAutoCompleteBooking(booking)) return;
+      if (autoCompletingRef.current.has(booking.id)) return;
+
+      autoCompletingRef.current.add(booking.id);
+
+      const request = bookingService
+        .markBookingComplete(booking.id)
+        .then(() => {
+          toast.success(`Booking ${booking.booking_reference || booking.id} marked as completed`, {
+            id: `auto-complete-${booking.id}`,
+          });
+        })
+        .catch((error: any) => {
+          autoCompletingRef.current.delete(booking.id);
+          if (!(error as any)?._toastShown) {
+            const message =
+              error?.response?.data?.message || error?.message || 'Failed to auto-complete booking';
+            toast.error(message, { id: `auto-complete-error-${booking.id}` });
+          }
+        });
+
+      completions.push(request.then(() => undefined));
+    });
+
+    if (completions.length > 0) {
+      Promise.allSettled(completions).then(() => {
+        queryClient.invalidateQueries(['bookings']);
+      });
+    }
+  }, [visibleBookings, user, queryClient]);
 
   // Simple periodic refresh for pending payments - aggressive polling while paying
   useEffect(() => {
