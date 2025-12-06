@@ -25,6 +25,68 @@ const ReportsAnalyticsPage: React.FC = () => {
 
   useEffect(() => { load(); }, [filters]);
 
+  const trends = analytics?.booking_trends ?? [];
+
+  const paidBookingsRaw = trends.reduce((sum, trend) => sum + (trend?.paid_bookings ?? 0), 0);
+  const cancelledBookingsRaw = trends.reduce((sum, trend) => sum + (trend?.cancelled_bookings ?? 0), 0);
+
+  const statusMap = (analytics?.status_distribution ?? []).reduce<Record<string, number>>((acc, entry) => {
+    const key = String(entry?.status ?? '').toLowerCase();
+    const source = entry as unknown as { count?: number; bookings?: number };
+    const count = Number(source?.count ?? source?.bookings ?? 0);
+    if (!key || !Number.isFinite(count) || count <= 0) {
+      return acc;
+    }
+    acc[key] = (acc[key] ?? 0) + count;
+    return acc;
+  }, {});
+
+  const fallbackConfirmed = analytics?.overall_stats?.confirmed_bookings ?? 0;
+  const fallbackCancelled = analytics?.overall_stats?.cancelled_bookings ?? 0;
+  const totalBookingsReported = analytics?.overall_stats?.total_bookings ?? 0;
+
+  const paidEligible = paidBookingsRaw > 0 ? paidBookingsRaw : fallbackConfirmed;
+  const statusEligible = (statusMap['confirmed'] ?? 0) + (statusMap['completed'] ?? 0);
+
+  // Treat confirmed bookings as the intersection of paid bookings and confirmed/completed statuses.
+  let confirmedBookings = 0;
+  if (paidEligible > 0 && statusEligible > 0) {
+    confirmedBookings = Math.min(paidEligible, statusEligible);
+  } else {
+    confirmedBookings = Math.max(paidEligible, statusEligible);
+  }
+  if (confirmedBookings <= 0) {
+    confirmedBookings = fallbackConfirmed > 0 ? fallbackConfirmed : paidBookingsRaw;
+  }
+
+  const cancelledEligible = statusMap['cancelled'] ?? 0;
+  const cancelledBookings = cancelledEligible > 0 ? cancelledEligible : (fallbackCancelled > 0 ? fallbackCancelled : cancelledBookingsRaw);
+  const pendingBookings = Math.max(0, totalBookingsReported - confirmedBookings - cancelledBookings);
+  const totalBookingsDisplay = totalBookingsReported > 0 ? totalBookingsReported : confirmedBookings + pendingBookings;
+
+  const confirmedRevenueRaw = (analytics?.peak_hours ?? []).reduce((sum, entry) => {
+    const revenue = Number(entry?.revenue ?? 0);
+    return sum + (Number.isFinite(revenue) ? revenue : 0);
+  }, 0);
+
+  const hoursFromPeak = (analytics?.peak_hours ?? []).reduce((sum, entry) => {
+    const bookings = Number(entry?.bookings ?? 0);
+    return sum + (Number.isFinite(bookings) ? bookings : 0);
+  }, 0);
+
+  const hoursFromFieldUtil = (analytics?.field_utilization ?? []).reduce((sum, field) => {
+    const hours = Number(field?.booked_hours ?? 0);
+    return sum + (Number.isFinite(hours) ? hours : 0);
+  }, 0);
+
+  const fallbackRevenue = analytics?.overall_stats?.total_revenue ?? 0;
+  const fallbackHours = analytics?.overall_stats?.total_hours ?? 0;
+
+  const confirmedRevenue = confirmedRevenueRaw > 0 ? confirmedRevenueRaw : fallbackRevenue;
+  const paidHours = hoursFromPeak > 0
+    ? hoursFromPeak
+    : (hoursFromFieldUtil > 0 ? hoursFromFieldUtil : fallbackHours);
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-screen-xl">
       <div className="mb-6">
@@ -58,9 +120,12 @@ const ReportsAnalyticsPage: React.FC = () => {
               <BookingOverview
                 compact
                 metrics={{
-                  total_bookings: analytics.overall_stats.total_bookings,
-                  total_hours: analytics.overall_stats.total_hours,
-                  total_revenue: analytics.overall_stats.total_revenue,
+                  total_revenue: confirmedRevenue,
+                  total_bookings: totalBookingsDisplay,
+                  confirmed_bookings: confirmedBookings,
+                  pending_payments: pendingBookings > 0 ? pendingBookings : undefined,
+                  cancelled_bookings: cancelledBookings > 0 ? cancelledBookings : undefined,
+                  total_hours: paidHours,
                 }}
               />
             </CardContent>
