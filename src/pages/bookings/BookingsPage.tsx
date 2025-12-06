@@ -431,7 +431,7 @@ const BookingsPage = () => {
                 <div className="bg-green-50 p-4 rounded-lg">
                   <h4 className="font-medium text-green-900 mb-2">Proof of Payment</h4>
                   <p className="text-green-800">
-                    Send proof of payment to: <strong>edendale@gmail.com</strong>
+                    Send proof of payment to: <strong>admin@edendalesports.co.za</strong>
                   </p>
                   <p className="text-green-800 mt-2">
                     Prefer cash? You can also pay at the field on arrival—bring your booking reference along.
