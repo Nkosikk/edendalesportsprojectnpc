@@ -414,10 +414,13 @@ const BookingsPage = () => {
                 <div className="bg-blue-50 p-4 rounded-lg">
                   <h4 className="font-medium text-blue-900 mb-2">Banking Details</h4>
                   <div className="space-y-1 text-blue-800">
-                    <p><strong>Bank:</strong> Capitec</p>
-                    <p><strong>Branch Code:</strong> 470010</p>
+                    <p><strong>Bank:</strong> First National Bank (FNB)</p>
                     <p><strong>Account Name:</strong> Edendale Sports Projects NPC</p>
-                    <p><strong>Account Number:</strong> 1234567890</p>
+                    <p><strong>Account Type:</strong> Gold Business Account</p>
+                    <p><strong>Account Number:</strong> 63134355858</p>
+                    <p><strong>Branch Code:</strong> 221325</p>
+                    <p><strong>Branch Name:</strong> Boom Street 674</p>
+                    <p><strong>Swift Code:</strong> FIRNZAJJ</p>
                   </div>
                 </div>
 

@@ -88,11 +88,20 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (pendingBooking) {
         try {
           const booking = JSON.parse(pendingBooking);
-          // Clear the pending booking
+          const { field_id, date, start_time, end_time, duration: pendingDuration } = booking || {};
           localStorage.removeItem('pendingBooking');
-          // Navigate to booking creation with stored params
-          const url = `/app/bookings/new?field_id=${booking.field_id}&date=${booking.date}&start_time=${booking.start_time}&end_time=${booking.end_time}`;
-          window.location.href = url;
+          if (field_id && date && start_time && end_time) {
+            const params = new URLSearchParams({
+              field_id: String(field_id),
+              date,
+              start_time,
+              end_time,
+            });
+            if (pendingDuration) {
+              params.set('duration', String(pendingDuration));
+            }
+            window.location.href = `/app/bookings/new?${params.toString()}`;
+          }
         } catch (e) {
           console.warn('Failed to parse pending booking:', e);
         }
@@ -130,13 +139,22 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (pendingBooking) {
         try {
           const booking = JSON.parse(pendingBooking);
-          // Clear the pending booking
+          const { field_id, date, start_time, end_time, duration: pendingDuration } = booking || {};
           localStorage.removeItem('pendingBooking');
-          // Longer delay for new registrations to ensure profile is ready
-          setTimeout(() => {
-            const url = `/app/bookings/new?field_id=${booking.field_id}&date=${booking.date}&start_time=${booking.start_time}&end_time=${booking.end_time}`;
-            window.location.href = url;
-          }, 300);
+          if (field_id && date && start_time && end_time) {
+            const params = new URLSearchParams({
+              field_id: String(field_id),
+              date,
+              start_time,
+              end_time,
+            });
+            if (pendingDuration) {
+              params.set('duration', String(pendingDuration));
+            }
+            setTimeout(() => {
+              window.location.href = `/app/bookings/new?${params.toString()}`;
+            }, 300);
+          }
         } catch (e) {
           console.warn('Failed to parse pending booking:', e);
           localStorage.removeItem('pendingBooking');

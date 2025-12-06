@@ -1,5 +1,5 @@
 import { Link, useNavigate } from 'react-router-dom';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Calendar, MapPin, Clock, Star, ShieldAlert } from 'lucide-react';
 import Button from '../components/ui/Button';
 
@@ -7,6 +7,8 @@ import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { fieldService } from '../services/fieldsService';
 import type { FieldAvailability, SportsField } from '../types';
+
+const QUICK_BOOKING_STORAGE_KEY = 'quickBookingSelection';
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -20,6 +22,18 @@ const HomePage = () => {
   const [duration, setDuration] = useState<number>(1);
   const [availability, setAvailability] = useState<FieldAvailability | null>(null);
   const [loadingAvailability, setLoadingAvailability] = useState<boolean>(false);
+  const [restoreSelection, setRestoreSelection] = useState<{ fieldId: number; date: string; duration: number } | null>(null);
+
+  const searchAvailability = useCallback(async () => {
+    if (!selectedFieldId || !date) return;
+    try {
+      setLoadingAvailability(true);
+      const data = await fieldService.getFieldAvailability(Number(selectedFieldId), date, duration);
+      setAvailability(data);
+    } finally {
+      setLoadingAvailability(false);
+    }
+  }, [selectedFieldId, date, duration]);
 
   const toLocalDateInputValue = (d: Date) => {
     const year = d.getFullYear();
@@ -28,13 +42,13 @@ const HomePage = () => {
     return `${year}-${month}-${day}`;
   };
 
-  const todayStr = useMemo(() => {
+  const todayStr = useMemo<string>(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return toLocalDateInputValue(d);
   }, []);
 
-  const maxDateStr = useMemo(() => {
+  const maxDateStr = useMemo<string>(() => {
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     d.setDate(d.getDate() + 30);
@@ -58,16 +72,112 @@ const HomePage = () => {
     load();
   }, []);
 
-  const searchAvailability = async () => {
-    if (!selectedFieldId || !date) return;
-    try {
-      setLoadingAvailability(true);
-      const data = await fieldService.getFieldAvailability(Number(selectedFieldId), date, duration);
-      setAvailability(data);
-    } finally {
-      setLoadingAvailability(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const navigationEntries = typeof performance.getEntriesByType === 'function'
+      ? (performance.getEntriesByType('navigation') as PerformanceNavigationTiming[])
+      : [];
+    const navEntry = navigationEntries.length > 0 ? navigationEntries[0] : undefined;
+    const isReload = navEntry?.type === 'reload'
+      || (typeof performance.navigation !== 'undefined' && performance.navigation.type === 1);
+
+    if (isReload) {
+      localStorage.removeItem(QUICK_BOOKING_STORAGE_KEY);
+      return;
     }
-  };
+
+    const saved = localStorage.getItem(QUICK_BOOKING_STORAGE_KEY);
+    if (!saved) return;
+
+    try {
+      const parsed = JSON.parse(saved) as { field_id?: number; date?: string; duration?: number; timestamp?: number };
+
+      const savedTs = Number(parsed?.timestamp ?? 0);
+      const maxAgeMs = 30 * 60 * 1000; // expire after 30 minutes
+      if (!Number.isFinite(savedTs) || Date.now() - savedTs > maxAgeMs) {
+        localStorage.removeItem(QUICK_BOOKING_STORAGE_KEY);
+        return;
+      }
+
+      const rawFieldId = Number(parsed?.field_id);
+      const hasField = Number.isFinite(rawFieldId) && rawFieldId > 0;
+
+      const rawDate = typeof parsed?.date === 'string' ? parsed.date : '';
+      let clampedDate: string = rawDate;
+      if (clampedDate) {
+        const parsedDate = new Date(`${clampedDate}T00:00:00`);
+        const minDate = new Date(`${todayStr}T00:00:00`);
+        const maxDate = new Date(`${maxDateStr}T00:00:00`);
+        if (parsedDate < minDate) {
+          clampedDate = todayStr;
+        } else if (parsedDate > maxDate) {
+          clampedDate = maxDateStr;
+        }
+      }
+
+      const rawDuration = Number(parsed?.duration);
+      const clampedDuration = Number.isFinite(rawDuration) && rawDuration > 0
+        ? Math.min(Math.max(Math.round(rawDuration), 1), 4)
+        : 1;
+
+      if (hasField) {
+        setSelectedFieldId(rawFieldId);
+      }
+      if (clampedDate) {
+        setDate(clampedDate);
+      }
+      setDuration(clampedDuration);
+
+      if (hasField && clampedDate) {
+        setRestoreSelection({ fieldId: rawFieldId, date: clampedDate, duration: clampedDuration });
+      }
+    } catch (error) {
+      console.warn('Failed to restore quick booking selection', error);
+      localStorage.removeItem(QUICK_BOOKING_STORAGE_KEY);
+    }
+  }, [todayStr, maxDateStr]);
+
+  useEffect(() => {
+    if (!restoreSelection) return;
+    if (!selectedFieldId || !date) return;
+    if (loadingFields) return;
+    if (Number(selectedFieldId) !== restoreSelection.fieldId) return;
+    if (date !== restoreSelection.date) return;
+    if (duration !== restoreSelection.duration) return;
+
+    let isActive = true;
+    (async () => {
+      await searchAvailability();
+      if (!isActive) return;
+      setRestoreSelection(null);
+    })();
+
+    return () => {
+      isActive = false;
+    };
+  }, [restoreSelection, selectedFieldId, date, duration, loadingFields, searchAvailability]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!selectedFieldId && !date) {
+      localStorage.removeItem(QUICK_BOOKING_STORAGE_KEY);
+      return;
+    }
+
+    const payload = {
+      field_id: selectedFieldId ? Number(selectedFieldId) : null,
+      date,
+      duration,
+      timestamp: Date.now(),
+    };
+
+    try {
+      localStorage.setItem(QUICK_BOOKING_STORAGE_KEY, JSON.stringify(payload));
+    } catch (error) {
+      console.warn('Failed to persist quick booking selection', error);
+    }
+  }, [selectedFieldId, date, duration]);
 
   // Filter out past time slots for today's date
   const filterAvailableSlots = (slots: any[]) => {
@@ -105,11 +215,21 @@ const HomePage = () => {
       date,
       start_time: slot.start_time,
       end_time: slot.end_time,
+      duration,
       timestamp: Date.now()
     };
     localStorage.setItem('pendingBooking', JSON.stringify(bookingIntent));
     
-    const url = `/app/bookings/new?field_id=${selectedFieldId}&date=${date}&start_time=${slot.start_time}&end_time=${slot.end_time}`;
+    const params = new URLSearchParams({
+      field_id: String(selectedFieldId),
+      date,
+      start_time: slot.start_time,
+      end_time: slot.end_time,
+    });
+    if (duration) {
+      params.set('duration', String(duration));
+    }
+    const url = `/app/bookings/new?${params.toString()}`;
     // Navigate into protected route; ProtectedRoute will redirect to login if needed
     navigate(url);
   };
@@ -124,7 +244,7 @@ const HomePage = () => {
               Book Your Perfect <span className="text-primary-600">Sports Field 🚀</span>
             </h1>
             <p className="text-sm text-gray-600 max-w-2xl mx-auto">
-              Premium sports facilities at Edendale Sports Projects NPC.
+              Premium sports facilities at Nyonithwele Sports Complex.
             </p>
           </div>
         </div>
@@ -341,23 +461,7 @@ const HomePage = () => {
                 </div>
               )}
               
-              <div className="mt-8 bg-primary-50 border border-primary-200 rounded-xl p-6 text-center">
-                <div className="text-2xl mb-2">⚡</div>
-                <h3 className="text-lg font-semibold text-primary-900 mb-2">Ready to Book?</h3>
-                <p className="text-primary-700 text-sm mb-4">Use the Quick Booking section above to check availability and secure your field!</p>
-                <div className="flex flex-wrap justify-center gap-3">
-                  <Link to="/register">
-                    <Button size="sm" className="px-4">
-                      🏃‍♂️ Sign Up Now
-                    </Button>
-                  </Link>
-                  <Link to="/app/fields">
-                    <Button variant="outline" size="sm" className="px-4">
-                      🔍 Browse All Fields
-                    </Button>
-                  </Link>
-                </div>
-              </div>
+              
             </>
           )}
         </div>
@@ -412,7 +516,7 @@ const HomePage = () => {
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Quality Facilities</h3>
               <p className="text-gray-600 text-sm">
-                Well-maintained fields with modern facilities, changing rooms, and equipment.
+                Well-maintained fields with modern facilities and top-tier equipment.
               </p>
             </div>
           </div>

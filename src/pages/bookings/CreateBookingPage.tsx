@@ -102,6 +102,7 @@ const CreateBookingPage = () => {
     const dateParam = searchParams.get('date');
     const startParam = searchParams.get('start_time');
     const endParam = searchParams.get('end_time');
+    const durationParam = searchParams.get('duration');
 
     if (fieldParam) setFieldId(Number(fieldParam));
     if (dateParam) {
@@ -117,6 +118,13 @@ const CreateBookingPage = () => {
     }
     if (startParam) setStartTime(startParam);
     if (endParam) setEndTime(endParam);
+    if (durationParam) {
+      const parsedDuration = Number(durationParam);
+      if (Number.isFinite(parsedDuration) && parsedDuration > 0) {
+        const clamped = Math.min(Math.max(Math.round(parsedDuration), 1), 4);
+        setDuration(clamped);
+      }
+    }
   }, [searchParams]);
 
   // Reset any previously selected slot when field/date/duration changes to avoid stale summary
