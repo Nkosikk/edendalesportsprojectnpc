@@ -7,8 +7,11 @@ import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 import { fieldService } from '../services/fieldsService';
 import type { FieldAvailability, SportsField } from '../types';
+import { formatCurrency } from '../lib/utils';
+import { minutesToTimeHM, timeToMinutes } from '../utils/scheduling';
 
 const QUICK_BOOKING_STORAGE_KEY = 'quickBookingSelection';
+
 
 const HomePage = () => {
   const navigate = useNavigate();
@@ -207,6 +210,98 @@ const HomePage = () => {
     });
   };
 
+  const composedDurationSlots = useMemo(() => {
+    if (!availability) return [] as Array<{ start_time: string; end_time: string; price: number; available: boolean }>;
+    const desiredMinutes = Math.max(1, Number(duration)) * 60;
+    const hourlyRate = Number(availability.field?.hourly_rate ?? 0);
+    const slots = Array.isArray(availability.slots) ? availability.slots : [];
+
+    const normalizePrice = (rawPrice: any, minutes: number) => {
+      const numeric = Number(rawPrice);
+      if (Number.isFinite(numeric) && numeric > 0) return numeric;
+      if (!hourlyRate) return 0;
+      return hourlyRate * (minutes / 60);
+    };
+
+    const enriched = slots
+      .map((slot) => {
+        const startMinutes = timeToMinutes(slot.start_time);
+        const endMinutes = timeToMinutes(slot.end_time);
+        if (startMinutes === null || endMinutes === null) return null;
+        if (endMinutes <= startMinutes) return null;
+        const spanMinutes = endMinutes - startMinutes;
+        const price = normalizePrice(slot.price, spanMinutes);
+        return {
+          ...slot,
+          startMinutes,
+          endMinutes,
+          spanMinutes,
+          normalizedPrice: price,
+        };
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.startMinutes - b.startMinutes) as Array<{
+        start_time: string;
+        end_time: string;
+        available: boolean;
+        price?: number;
+        startMinutes: number;
+        endMinutes: number;
+        spanMinutes: number;
+        normalizedPrice: number;
+      }>;
+
+    const slotMap = new Map<string, { start_time: string; end_time: string; price: number; available: boolean }>();
+
+    enriched.forEach((slot) => {
+      if (!slot.available) return;
+      if (slot.spanMinutes === desiredMinutes) {
+        const key = `${slot.start_time}-${slot.end_time}`;
+        slotMap.set(key, {
+          start_time: slot.start_time,
+          end_time: slot.end_time,
+          available: true,
+          price: slot.normalizedPrice || hourlyRate * (desiredMinutes / 60),
+        });
+      }
+    });
+
+    const availableOnly = enriched.filter((slot) => slot.available);
+
+    for (let i = 0; i < availableOnly.length; i++) {
+      const initial = availableOnly[i];
+      if (initial.spanMinutes > desiredMinutes) continue;
+      let accumulatedMinutes = initial.spanMinutes;
+      let accumulatedPrice = initial.normalizedPrice;
+      let currentEnd = initial.endMinutes;
+      let j = i + 1;
+
+      while (accumulatedMinutes < desiredMinutes && j < availableOnly.length) {
+        const nextSlot = availableOnly[j];
+        if (nextSlot.startMinutes !== currentEnd) break;
+        accumulatedMinutes += nextSlot.spanMinutes;
+        accumulatedPrice += nextSlot.normalizedPrice;
+        currentEnd = nextSlot.endMinutes;
+        j += 1;
+      }
+
+      if (accumulatedMinutes === desiredMinutes) {
+        const startTime = minutesToTimeHM(initial.startMinutes);
+        const endTime = minutesToTimeHM(currentEnd);
+        const key = `${startTime}-${endTime}`;
+        const price = accumulatedPrice > 0 ? accumulatedPrice : hourlyRate * (desiredMinutes / 60);
+        slotMap.set(key, {
+          start_time: startTime,
+          end_time: endTime,
+          available: true,
+          price,
+        });
+      }
+    }
+
+    return Array.from(slotMap.values()).sort((a, b) => a.start_time.localeCompare(b.start_time));
+  }, [availability, duration]);
+
   const handleBook = (slot: { start_time: string; end_time: string }) => {
     if (!selectedFieldId || !date) return;
     // Store booking intent for post-login restoration
@@ -326,14 +421,14 @@ const HomePage = () => {
                     <div className="lg:col-span-2">
                       <h3 className="text-base font-semibold mb-2">Time Slots</h3>
                       {(() => {
-                        const filteredSlots = filterAvailableSlots(availability.slots);
+                        const filteredSlots = filterAvailableSlots(composedDurationSlots);
                         return filteredSlots.length === 0 ? (
                           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                            <p className="text-amber-800 font-medium">No available slots for the selected date and time.</p>
+                            <p className="text-amber-800 font-medium">No available slots match the selected duration on this date.</p>
                             <p className="text-amber-700 text-sm mt-1">
                               {date === todayStr 
-                                ? "Try selecting a future date or check back tomorrow for more availability."
-                                : "Please try a different date or contact us for assistance."}
+                                ? "Try selecting a later time today or choose another date for longer slots."
+                                : "Please try a different date or shorten the duration."}
                             </p>
                           </div>
                         ) : (
@@ -348,20 +443,11 @@ const HomePage = () => {
                                 <div className="font-bold text-gray-900">
                                   {slot.start_time} - {slot.end_time}
                                 </div>
-                                {!slot.available && (
-                                  <span className="bg-gray-200 text-gray-600 px-2 py-1 rounded-full text-xs font-medium">Unavailable</span>
-                                )}
                               </div>
-                              <div className="text-lg font-semibold text-primary-600 mb-3">R {Number(slot.price || 0).toFixed(2)}</div>
-                              {slot.available ? (
-                                <Button size="sm" onClick={() => handleBook(slot)} className="w-full font-semibold">
-                                  ⚡ Book This Slot
-                                </Button>
-                              ) : (
-                                <div className="w-full py-2 text-center text-xs text-gray-500 font-medium">
-                                  Not Available
-                                </div>
-                              )}
+                              <div className="text-lg font-semibold text-primary-600 mb-3">{formatCurrency(slot.price)}</div>
+                              <Button size="sm" onClick={() => handleBook(slot)} className="w-full font-semibold">
+                                ⚡ Book This Slot
+                              </Button>
                             </div>
                             ))}
                           </div>

@@ -13,9 +13,10 @@ const PUBLIC_HOLIDAYS: string[] = [
   '06-16', // Youth Day
   '08-09', // National Women's Day
   '09-24', // Heritage Day
-  '12-16', // Day of Reconciliation
+  '12-16', // Day of Reconciliation (public holiday)
   '12-25', // Christmas Day
   '12-26', // Day of Goodwill
+  '12-16', // Day of Reconciliation (duplicate to ensure recognition)
 ];
 
 export const pad = (n: number) => (n < 10 ? `0${n}` : `${n}`);
@@ -36,6 +37,21 @@ const extractTimeParts = (value: string | null | undefined): [number, number, nu
   }
   const parts = String(value).split(':');
   return [sanitizeNumber(parts[0], 0), sanitizeNumber(parts[1], 0), sanitizeNumber(parts[2], 0)];
+};
+
+export const timeToMinutes = (time: string | null | undefined): number | null => {
+  if (!time) return null;
+  const [hours, minutes] = extractTimeParts(time);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
+  return hours * 60 + minutes;
+};
+
+export const minutesToTimeHM = (totalMinutes: number): string => {
+  if (!Number.isFinite(totalMinutes)) return '';
+  const minutes = Math.max(0, Math.round(totalMinutes));
+  const hoursPart = Math.floor(minutes / 60);
+  const minutesPart = minutes % 60;
+  return `${pad(hoursPart)}:${pad(minutesPart)}`;
 };
 
 export const normalizeTimeHM = (time: string | null | undefined): string => {
@@ -71,7 +87,10 @@ export const isPublicHoliday = (date: Date) => {
 };
 
 export const getOperatingHours = (date: Date): { startHour: number; endHour: number } => {
-  if (isWeekend(date) || isPublicHoliday(date)) {
+  if (isPublicHoliday(date)) {
+    return { startHour: WEEKEND_START_HOUR, endHour: WEEKEND_END_HOUR };
+  }
+  if (isWeekend(date)) {
     return { startHour: WEEKEND_START_HOUR, endHour: WEEKEND_END_HOUR };
   }
   return { startHour: WEEKDAY_START_HOUR, endHour: WEEKDAY_END_HOUR };

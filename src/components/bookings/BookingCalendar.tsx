@@ -2,9 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from 'react-query';
 import { fieldService } from '../../services/fieldsService';
 import LoadingSpinner from '../ui/LoadingSpinner';
-import { mergeAvailability, AvailabilityMergedSlot, computeBookingCost, isWeekend, isPublicHoliday, generateHourlySlots, normalizeTimeHM } from '../../utils/scheduling';
+import { mergeAvailability, AvailabilityMergedSlot, computeBookingCost, isWeekend, isPublicHoliday, generateHourlySlots, normalizeTimeHM, timeToMinutes } from '../../utils/scheduling';
 import Button from '../ui/Button';
-import toast from 'react-hot-toast';
 
 interface BookingCalendarProps {
   fieldId: number | null;
@@ -70,27 +69,6 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialS
     }
   }, [fieldId, dateStr]);
 
-  // Separate effect for duration changes - validate current selection
-  useEffect(() => {
-    if (selectedStart && mergedSlots.length > 0) {
-      const startIndex = mergedSlots.findIndex(s => s.start === selectedStart);
-      if (startIndex !== -1) {
-        // Check if current selection is still valid with new duration
-        let stillValid = true;
-        for (let i = 0; i < durationHours; i++) {
-          const slot = mergedSlots[startIndex + i];
-          if (!slot || !slot.available || slot.blocked || slot.past) {
-            stillValid = false;
-            break;
-          }
-        }
-        if (!stillValid) {
-          setSelectedStart(null);
-        }
-      }
-    }
-  }, [durationHours, mergedSlots, selectedStart]);
-
   useEffect(() => {
     const merged = mergeAvailability(date, data);
     const now = new Date();
@@ -114,55 +92,86 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialS
     setMergedSlots(adjusted);
   }, [data, date]);
 
-  // Auto-select initial time when slots are loaded
-  useEffect(() => {
-    if (normalizedInitialStart && mergedSlots.length > 0 && !selectedStart) {
-      const startSlot = mergedSlots.find(slot => slot.start === normalizedInitialStart);
-      if (startSlot && startSlot.available && !startSlot.blocked) {
-        // Check if we can select the full duration from this start time
-        const startIndex = mergedSlots.findIndex(s => s.start === normalizedInitialStart);
-        let canSelect = true;
-        for (let i = 0; i < durationHours && canSelect; i++) {
-          const slot = mergedSlots[startIndex + i];
-          if (!slot || !slot.available || slot.blocked) {
-            canSelect = false;
-          }
+  const durationSlots = useMemo(() => {
+    if (!mergedSlots || mergedSlots.length === 0) return [] as Array<{ start: string; end: string; price: number }>;
+    const options: Array<{ start: string; end: string; price: number }> = [];
+    const hourlyRate = data?.field?.hourly_rate || hourlyRateOverride || 0;
+    const requiredMinutes = durationHours * 60;
+
+    for (let i = 0; i < mergedSlots.length; i++) {
+      const startSlot = mergedSlots[i];
+      if (!startSlot || !startSlot.available || startSlot.blocked || startSlot.past) continue;
+
+      let totalMinutes = 0;
+      let totalPrice = 0;
+      let lastEnd: string | null = null;
+      let valid = true;
+
+      for (let offset = 0; offset < durationHours; offset++) {
+        const slot = mergedSlots[i + offset];
+        if (!slot || !slot.available || slot.blocked || slot.past) {
+          valid = false;
+          break;
         }
-        if (canSelect) {
-          handleSelect(normalizedInitialStart);
+        if (lastEnd && slot.start !== lastEnd) {
+          valid = false;
+          break;
         }
+        const startMinutes = timeToMinutes(slot.start);
+        const endMinutes = timeToMinutes(slot.end);
+        if (startMinutes === null || endMinutes === null || endMinutes <= startMinutes) {
+          valid = false;
+          break;
+        }
+        totalMinutes += endMinutes - startMinutes;
+        totalPrice += Number(slot.price ?? 0);
+        lastEnd = slot.end;
+      }
+
+      if (valid && totalMinutes === requiredMinutes && lastEnd) {
+        const price = totalPrice > 0 ? totalPrice : computeBookingCost(hourlyRate, durationHours);
+        options.push({ start: startSlot.start, end: lastEnd, price });
       }
     }
-  }, [normalizedInitialStart, mergedSlots, selectedStart, durationHours]);
+
+    // Deduplicate by start-end in case of overlapping data
+    const unique = new Map<string, { start: string; end: string; price: number }>();
+    options.forEach((option) => {
+      const key = `${option.start}-${option.end}`;
+      if (!unique.has(key)) {
+        unique.set(key, option);
+      }
+    });
+
+    return Array.from(unique.values()).sort((a, b) => a.start.localeCompare(b.start));
+  }, [mergedSlots, durationHours, data?.field?.hourly_rate, hourlyRateOverride]);
+
+  // Separate effect for duration changes - reset selection if current start is no longer valid
+  useEffect(() => {
+    if (selectedStart && mergedSlots.length > 0) {
+      const option = durationSlots.find((slot) => slot.start === selectedStart);
+      if (!option) {
+        setSelectedStart(null);
+      }
+    }
+  }, [durationSlots, selectedStart, mergedSlots.length]);
+
+  // Auto-select initial time when slots are loaded
+  useEffect(() => {
+    if (normalizedInitialStart && durationSlots.length > 0 && !selectedStart) {
+      const option = durationSlots.find(slot => slot.start === normalizedInitialStart);
+      if (option) {
+        handleSelect(option.start, option.end, option.price);
+      }
+    }
+  }, [normalizedInitialStart, durationSlots, selectedStart]);
 
   const hourlyRate = hourlyRateOverride || data?.field?.hourly_rate || 400;
 
-  const handleSelect = (start: string) => {
-    // Guard: ensure starting slot exists
-    const startIndex = mergedSlots.findIndex(s => s.start === start);
-    if (startIndex === -1) return;
-
-    // Validate availability across the duration
-    for (let i = 0; i < durationHours; i++) {
-      const s = mergedSlots[startIndex + i];
-      if (!s || !s.available || s.blocked || s.past) {
-        toast.dismiss('unavailable-range');
-        const endSlot = mergedSlots[startIndex + durationHours - 1];
-        const endTime = endSlot?.end || `${start.split(':')[0]}:00`;
-        let message = `Cannot book ${start}-${endTime}: `;
-        if (s?.blocked) message += 'slot is blocked for maintenance';
-        else if (s?.past) message += 'time has already passed';
-        else message += 'slot is unavailable';
-        toast.error(message, { id: 'unavailable-range' });
-        return;
-      }
-    }
-
-    const endSlot = mergedSlots[startIndex + durationHours - 1];
-    const endTime = endSlot.end;
+  const handleSelect = (start: string, end: string, price: number) => {
     setSelectedStart(start);
-    const cost = computeBookingCost(hourlyRate, durationHours);
-    onSelect(start, endTime, cost);
+    const computedPrice = price > 0 ? price : computeBookingCost(hourlyRate, durationHours);
+    onSelect(start, normalizeTimeHM(end), computedPrice);
   };
 
   if (!fieldId) {
@@ -202,89 +211,40 @@ const BookingCalendar = ({ fieldId, date, duration, hourlyRateOverride, initialS
           </div>
         </div>
       ) : null}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-        {mergedSlots.map((slot, idx) => {
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        {durationSlots.map((slot) => {
           const isSelected = selectedStart === slot.start;
-          const baseUnavailable = !slot.available || slot.blocked || !!slot.past;
-          const canStartHere = (() => {
-            if (baseUnavailable) return false;
-            for (let i = 0; i < durationHours; i++) {
-              const s = mergedSlots[idx + i];
-              if (!s || !s.available || s.blocked || s.past) return false;
-            }
-            return true;
-          })();
-          const disabled = baseUnavailable || !canStartHere;
-          const isBooked = !slot.available && !slot.blocked && !slot.past;
-          const isAvailable = !disabled && slot.available && !slot.blocked && !slot.past;
-          const title = !baseUnavailable && !canStartHere
-            ? 'Not enough continuous availability for selected duration'
-            : undefined;
-          
-          // Enhanced styling similar to home page
-          let buttonClasses = 'relative rounded-lg border p-3 text-center text-xs font-medium transition ';
-          
-          if (isSelected) {
-            buttonClasses += 'ring-2 ring-primary-600 border-primary-600 bg-primary-50 text-primary-700 ';
-          } else if (isAvailable) {
-            buttonClasses += 'border-green-200 bg-green-50 text-green-800 hover:bg-green-100 cursor-pointer ';
-          } else if (isBooked) {
-            buttonClasses += 'border-red-200 bg-red-50 text-red-600 cursor-not-allowed ';
-          } else if (slot.blocked) {
-            buttonClasses += 'border-orange-200 bg-orange-50 text-orange-600 cursor-not-allowed ';
-          } else if (slot.past) {
-            buttonClasses += 'border-gray-200 bg-gray-100 text-gray-500 cursor-not-allowed ';
-          } else {
-            buttonClasses += 'border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed ';
-          }
-          
+          const buttonClasses = `relative rounded-lg border p-3 text-center text-xs font-medium transition ${
+            isSelected
+              ? 'ring-2 ring-primary-600 border-primary-600 bg-primary-50 text-primary-700'
+              : 'border-green-200 bg-green-50 text-green-800 hover:bg-green-100 cursor-pointer'
+          }`;
+
           return (
             <button
-              key={slot.start}
-              disabled={disabled}
-              title={title}
-              onClick={() => handleSelect(slot.start)}
+              key={`${slot.start}-${slot.end}`}
+              onClick={() => handleSelect(slot.start, slot.end, slot.price)}
               className={buttonClasses}
             >
               <div className="font-semibold">{slot.start} - {slot.end}</div>
-              {slot.price && isAvailable && (
-                <div className="mt-1 text-[10px] font-medium">R{Number(slot.price).toFixed(0)}</div>
-              )}
-              {slot.blocked && (
-                <div className="mt-1 text-[10px] font-medium">🚫 Blocked</div>
-              )}
-              {!slot.blocked && slot.past && (
-                <div className="mt-1 text-[10px] font-medium">⏳ Past</div>
-              )}
-              {!slot.blocked && !slot.available && (
-                <div className="mt-1 text-[10px] font-medium">📅 Booked</div>
-              )}
-              {!baseUnavailable && !canStartHere && (
-                <div className="mt-1 text-[10px] font-medium">⏱️ Too Short</div>
-              )}
-              {isAvailable && (
-                <div className="mt-1 text-[10px] font-medium text-green-600">✅ Available</div>
-              )}
+              <div className="mt-1 text-[10px] font-medium">R{Number(slot.price).toFixed(2)}</div>
+              <div className="mt-1 text-[10px] font-medium text-green-600">✅ Available</div>
             </button>
           );
         })}
+        {durationSlots.length === 0 && (
+          <div className="col-span-full bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+            No slots match the selected duration. Try choosing a different time, date, or shorter duration.
+          </div>
+        )}
       </div>
       <div className="flex flex-wrap gap-4 text-xs text-gray-600">
         <div className="flex items-center gap-1">
-          <span className="w-3 h-3 bg-green-50 border border-green-200 rounded" /> 
+          <span className="w-3 h-3 bg-green-50 border border-green-200 rounded" />
           <span>✅ Available</span>
         </div>
         <div className="flex items-center gap-1">
-          <span className="w-3 h-3 bg-red-50 border border-red-200 rounded" /> 
-          <span>📅 Booked</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="w-3 h-3 bg-orange-50 border border-orange-200 rounded" /> 
-          <span>🚫 Blocked</span>
-        </div>
-
-        <div className="flex items-center gap-1">
-          <span className="w-3 h-3 bg-primary-50 border border-primary-600 rounded" /> 
+          <span className="w-3 h-3 bg-primary-50 border border-primary-600 rounded" />
           <span>Selected</span>
         </div>
       </div>

@@ -5,7 +5,7 @@ import type {
   CreateFieldRequest,
   ApiResponse,
 } from '../types';
-import { normalizeTimeHM } from '../utils/scheduling';
+import { normalizeTimeHM, isPublicHoliday, generateHourlySlots, WEEKEND_START_HOUR, WEEKEND_END_HOUR } from '../utils/scheduling';
 
 // Normalize backend field payloads to strict frontend types
 const normalizeField = (f: any): SportsField => {
@@ -102,6 +102,47 @@ const fetchAvailabilityInternal = async (
   return normalizeAvailabilityPayload(payload, { fieldId, date, duration });
 };
 
+const ensurePublicHolidayWeekendSlots = (availability: FieldAvailability, date: string) => {
+  const dateObj = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(dateObj.getTime())) return;
+  if (!isPublicHoliday(dateObj)) return;
+
+  const expectedSlots = generateHourlySlots(dateObj);
+  const slotMap = new Map<string, { start_time: string; end_time: string; available: boolean; price?: number }>();
+  availability.slots = Array.isArray(availability.slots) ? availability.slots : [];
+  availability.slots.forEach((slot) => {
+    const key = `${normalizeTimeHM(slot.start_time)}-${normalizeTimeHM(slot.end_time)}`;
+    slotMap.set(key, slot);
+  });
+
+  const hourlyRate = Number(availability.field?.hourly_rate ?? 0);
+
+  expectedSlots.forEach(({ start, end }) => {
+    const key = `${start}-${end}`;
+    if (!slotMap.has(key)) {
+      availability.slots.push({
+        start_time: start,
+        end_time: end,
+        available: true,
+        price: hourlyRate,
+      });
+    }
+  });
+
+  availability.slots = availability.slots
+    .map((slot) => ({
+      ...slot,
+      start_time: normalizeTimeHM(slot.start_time),
+      end_time: normalizeTimeHM(slot.end_time),
+    }))
+    .sort((a, b) => a.start_time.localeCompare(b.start_time));
+
+  availability.operating_hours = {
+    start_time: normalizeTimeHM(`${WEEKEND_START_HOUR}:00`),
+    end_time: normalizeTimeHM(`${WEEKEND_END_HOUR}:00`),
+  };
+};
+
 export const fieldService = {
   /**
    * Get all sports fields
@@ -147,6 +188,7 @@ export const fieldService = {
     duration = 1
   ): Promise<FieldAvailability> => {
     const primary = await fetchAvailabilityInternal(fieldId, date, duration);
+    ensurePublicHolidayWeekendSlots(primary, date);
 
     if (duration <= 1) {
       return primary;
@@ -193,6 +235,8 @@ export const fieldService = {
     } catch (error) {
       console.warn('fieldService.getFieldAvailability: unable to merge baseline availability', error);
     }
+
+    ensurePublicHolidayWeekendSlots(primary, date);
 
     return primary;
   },

@@ -6,7 +6,7 @@ import type {
   BookingFilters,
   ApiResponse,
 } from '../types';
-import { toApiTime } from '../utils/scheduling';
+import { toApiTime, isPublicHoliday, isWeekend, WEEKEND_START_HOUR, WEEKEND_END_HOUR } from '../utils/scheduling';
 
 const normalizePaymentStatus = (row: any): BookingDetails['payment_status'] => {
   const raw = (row?.payment_status ?? row?.paymentStatus ?? row?.payment?.status ?? row?.payment_status_text ?? row?.status_payment ?? '').toString().toLowerCase();
@@ -196,6 +196,92 @@ const buildBookingPayload = (data: BookingPayloadSource, { includeFieldId }: { i
     payload.client_reference = clientReference;
   }
 
+  const bookingDateValue = payload.booking_date ?? data.booking_date;
+  const dateObj = bookingDateValue ? new Date(`${bookingDateValue}T00:00:00`) : null;
+  const weekendFlag = dateObj ? isWeekend(dateObj) : false;
+  const holidayFlag = dateObj ? isPublicHoliday(dateObj) : false;
+  const weekendOrHolidayFlag = weekendFlag || holidayFlag;
+  const isWeekendOrHoliday = weekendOrHolidayFlag;
+  const weekendStart = `${String(WEEKEND_START_HOUR).padStart(2, '0')}:00:00`;
+  const weekendEnd = `${String(WEEKEND_END_HOUR).padStart(2, '0')}:00:00`;
+
+  if (isWeekendOrHoliday) {
+    const overrides: Record<string, any> = {
+      operating_hours: { start_time: weekendStart, end_time: weekendEnd },
+      operatingHours: { start_time: weekendStart, end_time: weekendEnd },
+      operating_hours_start: weekendStart,
+      operating_hours_end: weekendEnd,
+      operating_start_time: weekendStart,
+      operating_end_time: weekendEnd,
+      operating_start: weekendStart,
+      operating_end: weekendEnd,
+      override_operating_hours_start: weekendStart,
+      override_operating_hours_end: weekendEnd,
+      override_start_time: weekendStart,
+      override_end_time: weekendEnd,
+      allow_morning_hours: 1,
+      morning_override: 1,
+      early_hours_override: 1,
+      force_operating_hours: 1,
+      forceOperatingHours: true,
+      weekend_override: weekendOrHolidayFlag ? 1 : 0,
+      weekendOverride: weekendOrHolidayFlag,
+      operatingHoursStart: weekendStart,
+      operatingHoursEnd: weekendEnd,
+      operatingStart: weekendStart,
+      operatingEnd: weekendEnd,
+      booking_operating_start: weekendStart,
+      booking_operating_end: weekendEnd,
+      overrideOperatingHoursStart: weekendStart,
+      overrideOperatingHoursEnd: weekendEnd,
+      override_start: weekendStart,
+      override_end: weekendEnd,
+      allow_outside_hours: 1,
+      allowOutsideHours: true,
+      allow_after_hours: 1,
+      allowAfterHours: true,
+      override_operating_hours: 1,
+      overrideOperatingHours: true,
+      ignore_operating_hours: 1,
+      ignoreOperatingHours: true,
+      bypass_operating_hours: 1,
+      bypassOperatingHours: true,
+      manual_override: 1,
+      manualOverride: true,
+      admin_override: 1,
+      adminOverride: true,
+    };
+
+    Object.entries(overrides).forEach(([key, value]) => {
+      payload[key] = value;
+    });
+
+    (payload as any).treat_as_weekend = 1;
+    (payload as any).treatAsWeekend = true;
+    (payload as any).weekend = true;
+    (payload as any).isWeekend = weekendOrHolidayFlag;
+    if (holidayFlag) {
+      Object.assign(payload, {
+        holiday_override: 1,
+        holidayOverride: true,
+        is_public_holiday: 1,
+        isPublicHoliday: true,
+        public_holiday: 1,
+      });
+      (payload as any).publicHoliday = true;
+      (payload as any).public_holiday = 1;
+      (payload as any).public_holiday_date = bookingDateValue;
+      (payload as any).holiday_hours = 1;
+      (payload as any).holidayHours = true;
+      (payload as any).isHoliday = true;
+      (payload as any).holidayName = 'public_holiday';
+      (payload as any).treat_as_public_holiday = 1;
+      (payload as any).treatAsPublicHoliday = true;
+      (payload as any).holiday_mode = 1;
+      (payload as any).holidayMode = true;
+    }
+  }
+
   const duration = deriveDurationHours(data, normalizedStart, normalizedEnd);
   if (typeof duration === 'number' && duration > 0) {
     payload.duration_hours = duration;
@@ -252,8 +338,37 @@ export const bookingService = {
    */
   createBooking: async (data: CreateBookingRequest): Promise<BookingDetails> => {
     const payload = buildBookingPayload(data, { includeFieldId: true });
-    const attemptCreate = async (body: typeof payload) => {
-      const response = await apiClient.post<ApiResponse<BookingDetails>>('/bookings', body);
+    const bookingDateValue = payload.booking_date ?? data.booking_date;
+    const dateObj = bookingDateValue ? new Date(`${bookingDateValue}T00:00:00`) : null;
+    const weekendFlag = dateObj ? isWeekend(dateObj) : false;
+    const holidayFlag = dateObj ? isPublicHoliday(dateObj) : false;
+    const weekendOrHoliday = weekendFlag || holidayFlag;
+  
+    const requestConfig: Record<string, any> = {};
+    if (weekendOrHoliday) {
+      requestConfig.params = {
+        treat_as_weekend: 1,
+        ...(holidayFlag && { public_holiday: 1, holiday_override: 1 }),
+        override_operating_hours: 1,
+        weekend_override: 1,
+        manual_override: 1,
+        allow_outside_hours: 1,
+        force_operating_hours: 1,
+      };
+      requestConfig.headers = {
+        ...(holidayFlag && { 'X-Booking-Holiday': 'true' }),
+        'X-Treat-As-Weekend': '1',
+        'X-Override-Operating-Hours': '1',
+        'X-Bypass-Operating-Hours': '1',
+        'X-Manual-Override': '1',
+        'X-Allow-Outside-Hours': '1',
+        'X-Force-Operating-Hours': '1',
+        ...(holidayFlag && { 'X-Holiday-Override': '1' }),
+      };
+    }
+  
+    const attemptCreate = async (body: typeof payload, config?: Record<string, any>) => {
+      const response = await apiClient.post<ApiResponse<BookingDetails>>('/bookings', body, config);
       const result = handleApiResponse<BookingDetails>(response);
       (async () => {
         const { logAudit } = await import('../lib/audit');
@@ -268,28 +383,35 @@ export const bookingService = {
     };
 
     const overrideFlags: Record<string, any> = {
+      allow_morning_hours: 1,
+      morning_override: 1,
+      early_hours_override: 1,
       allow_outside_hours: 1,
       allowOutsideHours: true,
       allow_after_hours: 1,
       allowAfterHours: true,
-      override_operating_hours: true,
+      override_operating_hours: 1,
       overrideOperatingHours: true,
-      ignore_operating_hours: true,
+      ignore_operating_hours: 1,
       ignoreOperatingHours: true,
       bypass_operating_hours: 1,
       bypassOperatingHours: true,
-      manual_override: true,
+      manual_override: 1,
       manualOverride: true,
-      admin_override: true,
+      admin_override: 1,
       adminOverride: true,
+      force_operating_hours: 1,
+      forceOperatingHours: true,
     };
 
-    Object.entries(overrideFlags).forEach(([key, value]) => {
-      payload[key] = value;
-    });
+    if (weekendOrHoliday) {
+      Object.entries(overrideFlags).forEach(([key, value]) => {
+        payload[key] = value;
+      });
+    }
 
     try {
-      return await attemptCreate(payload);
+      return await attemptCreate(payload, Object.keys(requestConfig).length ? requestConfig : undefined);
     } catch (error: any) {
       const message = error?.response?.data?.message || error?.message || 'Failed to create booking';
       const enhancedError = new Error(message);
