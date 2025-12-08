@@ -66,9 +66,9 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
   const paymentStatusCardClass = paymentStatus.cardModifier ? ` ${paymentStatus.cardModifier}` : '';
 
   return (
-    <div className="max-w-4xl mx-auto bg-white p-2 shadow-lg invoice-container" id="invoice-content">
+    <div className="w-full min-w-[280px] mx-auto bg-white p-2 shadow-lg invoice-container" id="invoice-content">
       {/* Header */}
-      <div className="flex justify-between items-start mb-2 pb-1 border-b-2 border-primary-500 invoice-header">
+      <div className="flex flex-col sm:flex-row sm:justify-between items-start mb-2 pb-1 border-b-2 border-primary-500 invoice-header gap-2">
         <div className="flex items-center space-x-1 invoice-header-left">
           {/* Logo */}
           <div className="flex-shrink-0">
@@ -80,17 +80,17 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
           </div>
           {/* Company Info */}
           <div className="invoice-company">
-            <h1 className="text-sm font-bold text-gray-900 invoice-company-name">{invoiceData.companyInfo.name}</h1>
-            <div className="text-xs text-gray-600 invoice-company-meta">
+            <h1 className="text-xs sm:text-sm font-bold text-gray-900 invoice-company-name">{invoiceData.companyInfo.name}</h1>
+            <div className="text-[10px] sm:text-xs text-gray-600 invoice-company-meta hidden sm:block">
               <p>{invoiceData.companyInfo.address} • {invoiceData.companyInfo.phone} • {invoiceData.companyInfo.email}</p>
             </div>
           </div>
         </div>
-        <div className="text-right invoice-header-right">
-          <div className="bg-primary-50 px-2 py-0 rounded invoice-badge">
+        <div className="text-left sm:text-right invoice-header-right w-full sm:w-auto">
+          <div className="bg-primary-50 px-2 py-0 rounded invoice-badge inline-block">
             <h2 className="text-sm font-bold text-primary-700 invoice-header-title">INVOICE</h2>
           </div>
-          <div className="text-xs text-gray-600 mt-0 invoice-header-meta">
+          <div className="text-[10px] sm:text-xs text-gray-600 mt-0 invoice-header-meta">
             <p><span className="font-semibold">Invoice #:</span> {invoiceData.invoiceNumber}</p>
             <p><span className="font-semibold">Date:</span> {formatDate(invoiceData.issueDate)}</p>
             <p><span className="font-semibold">Ref:</span> {invoiceData.booking_reference}</p>
@@ -110,44 +110,49 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
       {/* Invoice Details */}
       <div className="mb-1 invoice-section invoice-details-section">
         <h3 className="text-xs font-semibold text-primary-700 mb-0 invoice-section-title">Booking Details</h3>
-        <table className="w-full border-collapse bg-white shadow-sm rounded overflow-hidden text-xs invoice-table">
-          <thead>
-            <tr className="bg-primary-600 text-white">
-              <th className="px-1 py-0 text-left font-semibold">Description</th>
-              <th className="px-1 py-0 text-center font-semibold">Date</th>
-              <th className="px-1 py-0 text-center font-semibold">Time</th>
-              <th className="px-1 py-0 text-center font-semibold">Hrs</th>
-              <th className="px-1 py-0 text-right font-semibold">Rate</th>
-              <th className="px-1 py-0 text-right font-semibold">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b border-gray-200">
-              <td className="px-1 py-0">
-                <div className="font-semibold text-gray-900">{invoiceData.field_name}</div>
-                <div className="text-xs text-gray-600 capitalize">
-                  {invoiceData.sport_type.replace('_', ' ')} Field
-                </div>
-              </td>
-              <td className="px-1 py-0 text-center text-gray-900">
-                {formatDate(invoiceData.booking_date)}
-              </td>
-              <td className="px-1 py-0 text-center text-gray-900">
-                <div className="font-medium">{formatTime(invoiceData.start_time)}</div>
-                <div className="text-xs text-gray-600">to {formatTime(invoiceData.end_time)}</div>
-              </td>
-              <td className="px-1 py-0 text-center font-semibold text-gray-900">
-                {invoiceData.duration_hours}
-              </td>
-              <td className="px-1 py-0 text-right text-gray-900">
-                {formatCurrency(invoiceData.hourly_rate)}
-              </td>
-              <td className="px-1 py-0 text-right font-bold text-primary-700">
-                {formatCurrency(displayAmount)}
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div className="overflow-x-auto -mx-2 px-2">
+          <table className="w-full border-collapse bg-white shadow-sm rounded overflow-hidden text-[10px] sm:text-xs invoice-table min-w-[300px]">
+            <thead>
+              <tr className="bg-primary-600 text-white">
+                <th className="px-1 py-0.5 text-left font-semibold">Name</th>
+                <th className="px-1 py-0.5 text-center font-semibold hidden sm:table-cell">Date</th>
+                <th className="px-1 py-0.5 text-center font-semibold">Time</th>
+                <th className="px-1 py-0.5 text-center font-semibold">Hrs</th>
+                <th className="px-1 py-0.5 text-right font-semibold">Rate</th>
+                <th className="px-1 py-0.5 text-right font-semibold">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-gray-200">
+                <td className="px-1 py-0.5">
+                  <div className="font-semibold text-gray-900 truncate max-w-[80px] sm:max-w-none">{invoiceData.field_name}</div>
+                  <div className="text-[9px] sm:text-xs text-gray-600 capitalize">
+                    {invoiceData.sport_type.replace('_', ' ')}
+                  </div>
+                  <div className="text-[9px] text-gray-500 sm:hidden">
+                    {formatDate(invoiceData.booking_date)}
+                  </div>
+                </td>
+                <td className="px-1 py-0.5 text-center text-gray-900 hidden sm:table-cell">
+                  {formatDate(invoiceData.booking_date)}
+                </td>
+                <td className="px-1 py-0.5 text-center text-gray-900">
+                  <div className="font-medium text-[10px] sm:text-xs">{formatTime(invoiceData.start_time)}</div>
+                  <div className="text-[9px] sm:text-xs text-gray-600">- {formatTime(invoiceData.end_time)}</div>
+                </td>
+                <td className="px-1 py-0.5 text-center font-semibold text-gray-900">
+                  {invoiceData.duration_hours}
+                </td>
+                <td className="px-1 py-0.5 text-right text-gray-900 whitespace-nowrap">
+                  {formatCurrency(invoiceData.hourly_rate)}
+                </td>
+                <td className="px-1 py-0.5 text-right font-bold text-primary-700 whitespace-nowrap">
+                  {formatCurrency(displayAmount)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Totals */}
@@ -180,7 +185,7 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
       </div>
 
       {/* Payment Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-1 mb-1 invoice-payment">
+      <div className="grid grid-cols-1 gap-1 mb-1 invoice-payment">
         {/* Payment Status */}
         <div className={`bg-white border border-gray-200 rounded p-1 invoice-payment-card payment-status-card${paymentStatusCardClass}`}>
           <h4 className="font-semibold text-gray-900 mb-0 text-xs">Payment Status</h4>

@@ -63,7 +63,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
     <Modal isOpen={isOpen} onClose={onClose} title="Invoice" size="xl">
       <div className="space-y-6">
         {/* Invoice Preview */}
-        <div className="border rounded-lg p-4 max-h-96 overflow-y-auto">
+        <div className="border rounded-lg p-2 sm:p-4 max-h-[60vh] overflow-y-auto overflow-x-auto">
           <InvoiceGenerator 
             booking={booking}
             invoiceNumber={invoiceService.formatInvoiceNumber(booking?.booking_reference)}
@@ -71,15 +71,15 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
         </div>
 
         {/* Invoice Summary */}
-        <div className="bg-gray-50 p-4 rounded-lg">
-          <h4 className="font-medium text-gray-900 mb-3">Invoice Summary</h4>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="bg-gray-50 p-3 sm:p-4 rounded-lg">
+          <h4 className="font-medium text-gray-900 mb-2 sm:mb-3 text-sm sm:text-base">Invoice Summary</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-xs sm:text-sm">
             <div>
               <p><span className="text-gray-600">Invoice #:</span> {invoiceService.formatInvoiceNumber(booking?.booking_reference)}</p>
               <p><span className="text-gray-600">Status:</span> <span className={invoiceStatus.statusColor}>{invoiceStatus.statusText}</span></p>
               <p><span className="text-gray-600">Customer:</span> {booking?.first_name || ''} {booking?.last_name || ''}</p>
             </div>
-            <div className="text-right">
+            <div className="text-left sm:text-right">
               <p><span className="text-gray-600">Subtotal:</span> R{(invoiceTotals.subtotal || 0).toFixed(2)}</p>
               <p><span className="text-gray-600">VAT (0%):</span> R{(invoiceTotals.vat || 0).toFixed(2)}</p>
               <p className="font-medium"><span className="text-gray-600">Total:</span> R{(invoiceTotals.total || 0).toFixed(2)}</p>
