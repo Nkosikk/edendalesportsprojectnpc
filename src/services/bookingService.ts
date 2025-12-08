@@ -46,10 +46,49 @@ const pickString = (...values: any[]): string | undefined => {
   return undefined;
 };
 
+const isBookingTimePassed = (row: any): boolean => {
+  const bookingDate = pickString(row.booking_date, row.bookingDate, row.date);
+  const endTime = pickString(row.end_time, row.endTime, row.end);
+  if (!bookingDate || !endTime) return false;
+  
+  try {
+    // Parse booking date
+    const dateParts = bookingDate.split('-');
+    if (dateParts.length !== 3) return false;
+    
+    // Parse end time (handles "HH:mm" or "HH:mm:ss")
+    const timeMatch = endTime.match(/(\d{1,2}):(\d{1,2})/);
+    if (!timeMatch) return false;
+    
+    const bookingEndDateTime = new Date(
+      parseInt(dateParts[0]),
+      parseInt(dateParts[1]) - 1,
+      parseInt(dateParts[2]),
+      parseInt(timeMatch[1]),
+      parseInt(timeMatch[2])
+    );
+    
+    return new Date() > bookingEndDateTime;
+  } catch {
+    return false;
+  }
+};
+
 const normalizeBookingRecord = (row: any): BookingDetails => {
   const normalized: any = { ...row };
   normalized.payment_status = normalizePaymentStatus(row);
-  normalized.status = normalizeBookingStatus(row);
+  let status = normalizeBookingStatus(row);
+  
+  // Auto-mark as completed if booking is confirmed, paid, and time has passed
+  if (
+    status === 'confirmed' &&
+    normalized.payment_status === 'paid' &&
+    isBookingTimePassed(row)
+  ) {
+    status = 'completed';
+  }
+  
+  normalized.status = status;
   const id = pickNumber(row.id, row.booking_id, row.bookingId) ?? 0;
   normalized.id = Number(id);
   const paymentId = pickNumber(
