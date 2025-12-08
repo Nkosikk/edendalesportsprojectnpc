@@ -275,7 +275,8 @@ const BookingsManagementPage: React.FC = () => {
     booking_id: number,
     status: UpdateBookingStatusRequest['status'],
     reason?: string,
-    refundAmount?: number
+    refundAmount?: number,
+    successMessage?: string
   ) => {
     try {
       // Optimistic update
@@ -286,7 +287,7 @@ const BookingsManagementPage: React.FC = () => {
         reason: reason?.trim() || undefined,
         refund_amount: typeof refundAmount === 'number' ? refundAmount : undefined,
       });
-      toast.success('Status updated');
+      toast.success(successMessage ?? 'Status updated');
       load();
     } catch (e: any) {
       const msg = e?.response?.data?.message || e?.message || 'Failed to update status';
@@ -543,8 +544,7 @@ const BookingsManagementPage: React.FC = () => {
                 <button
                   onClick={async () => {
                     try {
-                      await updateStatus(booking.id, 'completed');
-                      toast.success('Booking marked as completed');
+                      await updateStatus(booking.id, 'completed', undefined, undefined, 'Booking marked as completed');
                     } catch (e: any) {
                       toast.error(e?.response?.data?.message || e?.message || 'Failed to mark as completed');
                     } finally {
