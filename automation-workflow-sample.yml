@@ -1,0 +1,77 @@
+# Sample workflow for your automation repository (edendaleautomation)
+# Save this as .github/workflows/run-tests-on-main-project-changes.yml
+
+name: Run Tests on Main Project Changes
+
+on:
+  repository_dispatch:
+    types: 
+      - main-project-updated
+      - main-project-build-status
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  run-automation-tests:
+    if: github.event.action == 'main-project-updated'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout automation code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Display trigger information
+        run: |
+          echo "Triggered by main project update:"
+          echo "Repository: ${{ github.event.client_payload.repository }}"
+          echo "Branch: ${{ github.event.client_payload.ref }}"
+          echo "Commit SHA: ${{ github.event.client_payload.sha }}"
+          echo "Pusher: ${{ github.event.client_payload.pusher }}"
+          echo "Commit Message: ${{ github.event.client_payload.commit_message }}"
+
+      - name: Run automation tests
+        run: |
+          # Replace with your actual test commands
+          npm test
+          # or
+          # npm run test:integration
+          # npm run test:e2e
+          # etc.
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: automation-test-results
+          path: |
+            test-results/
+            coverage/
+            reports/
+
+  handle-build-status:
+    if: github.event.action == 'main-project-build-status'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Display main project build status
+        run: |
+          echo "Main project build status: ${{ github.event.client_payload.status }}"
+          echo "Build URL: ${{ github.event.client_payload.run_url }}"
+          
+      - name: Conditional actions based on build status
+        run: |
+          if [ "${{ github.event.client_payload.status }}" = "success" ]; then
+            echo "Main project built successfully - running full test suite"
+            # Add commands for full test suite
+          elif [ "${{ github.event.client_payload.status }}" = "failure" ]; then
+            echo "Main project build failed - skipping some tests"
+            # Add commands for reduced test suite or notifications
+          fi

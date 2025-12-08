@@ -1,0 +1,57 @@
+name: Trigger Automation Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  trigger-tests:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Trigger automation tests
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.AUTOMATION_REPO_TOKEN }}
+          repository: Nkosikk/edendaleautomation
+          event-type: main-project-updated
+          client-payload: |
+            {
+              "ref": "${{ github.ref }}",
+              "sha": "${{ github.sha }}",
+              "repository": "${{ github.repository }}",
+              "pusher": "${{ github.actor }}",
+              "commit_message": "${{ github.event.head_commit.message }}"
+            }
+
+      - name: Build and test main project
+        run: |
+          npm ci
+          npm run build
+          npm run test
+
+  notify-status:
+    needs: trigger-tests
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Notify automation repo of build status
+        uses: peter-evans/repository-dispatch@v3
+        with:
+          token: ${{ secrets.AUTOMATION_REPO_TOKEN }}
+          repository: Nkosikk/edendaleautomation
+          event-type: main-project-build-status
+          client-payload: |
+            {
+              "status": "${{ needs.trigger-tests.result }}",
+              "run_id": "${{ github.run_id }}",
+              "run_url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
