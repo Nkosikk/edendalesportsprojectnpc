@@ -1,20 +1,18 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from 'react-query';
-import { ArrowLeft, Download, Mail } from 'lucide-react';
+import { ArrowLeft, Download } from 'lucide-react';
 import { bookingService } from '../../services/bookingService';
 import { invoiceService } from '../../services/invoiceService';
 import InvoiceGenerator from '../../components/invoices/InvoiceGenerator';
 import Button from '../../components/ui/Button';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
-import { useAuth } from '../../contexts/AuthContext';
 import toast from 'react-hot-toast';
 import { BookingDetails } from '../../types';
 
 const InvoicePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const bookingId = Number(id);
-  const { user } = useAuth();
 
   const { data: booking, isLoading, error } = useQuery<BookingDetails>(
     ['booking', bookingId],
@@ -32,19 +30,6 @@ const InvoicePage: React.FC = () => {
       toast.success('Invoice downloaded successfully');
     } catch (error: any) {
       toast.error(error.message || 'Failed to download invoice');
-    }
-  };
-
-  const handleEmailInvoice = async () => {
-    if (!booking || !user || user.role !== 'admin') {
-      toast.error('Only administrators can send invoices via email');
-      return;
-    }
-
-    try {
-      toast('Invoice emailing is coming soon.');
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to send invoice');
     }
   };
 
@@ -105,27 +90,22 @@ const InvoicePage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-gray-50 py-4 sm:py-8">
+      <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="mb-6 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link to="/app/bookings">
+        <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+            <Link to="/app/bookings" className="flex-shrink-0">
               <Button variant="outline" size="sm" icon={ArrowLeft}>Back</Button>
             </Link>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-base sm:text-2xl font-bold text-gray-900 truncate">
               Invoice - {invoiceService.formatInvoiceNumber(booking.booking_reference)}
             </h1>
           </div>
-          <div className="flex gap-2">
+          <div className="flex justify-end">
             <Button onClick={handleDownload} icon={Download} size="sm">
               Download
             </Button>
-            {user?.role === 'admin' && (
-              <Button onClick={handleEmailInvoice} variant="outline" icon={Mail} size="sm">
-                Email
-              </Button>
-            )}
           </div>
         </div>
 
