@@ -355,16 +355,19 @@ export const bookingService = {
         allow_outside_hours: 1,
         force_operating_hours: 1,
       };
-      requestConfig.headers = {
-        ...(holidayFlag && { 'X-Booking-Holiday': 'true' }),
-        'X-Treat-As-Weekend': '1',
-        'X-Override-Operating-Hours': '1',
-        'X-Bypass-Operating-Hours': '1',
-        'X-Manual-Override': '1',
-        'X-Allow-Outside-Hours': '1',
-        'X-Force-Operating-Hours': '1',
-        ...(holidayFlag && { 'X-Holiday-Override': '1' }),
-      };
+      if (import.meta.env.DEV) {
+        // These debugging headers remain in development where the Vite proxy avoids CORS checks.
+        requestConfig.headers = {
+          ...(holidayFlag && { 'X-Booking-Holiday': 'true' }),
+          'X-Treat-As-Weekend': '1',
+          'X-Override-Operating-Hours': '1',
+          'X-Bypass-Operating-Hours': '1',
+          'X-Manual-Override': '1',
+          'X-Allow-Outside-Hours': '1',
+          'X-Force-Operating-Hours': '1',
+          ...(holidayFlag && { 'X-Holiday-Override': '1' }),
+        };
+      }
     }
   
     const attemptCreate = async (body: typeof payload, config?: Record<string, any>) => {
