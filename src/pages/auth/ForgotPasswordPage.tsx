@@ -37,7 +37,7 @@ const ForgotPasswordPage: React.FC = () => {
         {/* Back to Login */}
         <div className="mb-6">
           <Link 
-            to="/auth/login"
+            to="/login"
             className="inline-flex items-center gap-2 text-white hover:text-primary-100 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -89,7 +89,7 @@ const ForgotPasswordPage: React.FC = () => {
               {/* Help Text */}
               <p className="text-center text-sm text-gray-600 mt-6">
                 Remember your password?{' '}
-                <Link to="/auth/login" className="font-medium text-primary-600 hover:text-primary-700">
+                <Link to="/login" className="font-medium text-primary-600 hover:text-primary-700">
                   Sign In
                 </Link>
               </p>
@@ -110,7 +110,7 @@ const ForgotPasswordPage: React.FC = () => {
                 </p>
 
                 <Button 
-                  onClick={() => navigate('/auth/login')}
+                  onClick={() => navigate('/login')}
                   className="w-full"
                 >
                   Back to Login

@@ -20,7 +20,7 @@ const ResetPasswordPage: React.FC = () => {
   useEffect(() => {
     if (!token) {
       toast.error('Invalid or missing reset token');
-      navigate('/auth/login');
+      navigate('/login');
     }
   }, [token, navigate]);
 
@@ -73,7 +73,7 @@ const ResetPasswordPage: React.FC = () => {
         {/* Back Link */}
         <div className="mb-6">
           <Link 
-            to="/auth/login"
+            to="/login"
             className="inline-flex items-center gap-2 text-white hover:text-primary-100 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -171,7 +171,7 @@ const ResetPasswordPage: React.FC = () => {
                 </p>
 
                 <Button 
-                  onClick={() => navigate('/auth/login')}
+                  onClick={() => navigate('/login')}
                   className="w-full"
                 >
                   Sign In
