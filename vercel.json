@@ -21,6 +21,14 @@
       "destination": "/"
     },
     {
+      "source": "/forgot-password",
+      "destination": "/"
+    },
+    {
+      "source": "/reset-password",
+      "destination": "/"
+    },
+    {
       "source": "/app/(.*)",
       "destination": "/"
     },

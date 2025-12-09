@@ -68,13 +68,13 @@ const ResetPasswordPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-600 to-primary-800 flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-primary-600 to-primary-800 flex items-start justify-center px-4 pt-6 sm:pt-10 pb-8">
       <div className="w-full max-w-md">
         {/* Back Link */}
-        <div className="mb-6">
+        <div className="mb-4">
           <Link 
             to="/login"
-            className="inline-flex items-center gap-2 text-white hover:text-primary-100 transition-colors"
+            className="inline-flex items-center gap-2 text-white hover:text-primary-100 transition-colors text-sm"
           >
             <ArrowLeft className="w-4 h-4" />
             <span>Back to Login</span>
