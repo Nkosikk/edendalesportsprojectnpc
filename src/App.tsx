@@ -8,6 +8,8 @@ import { UserRole } from './types'
 // Pages
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/auth/LoginPage'
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage'
+import ResetPasswordPage from './pages/auth/ResetPasswordPage'
 import DashboardPage from './pages/dashboard/DashboardPage'
 import BookingsPage from './pages/bookings/BookingsPage'
 import BookingDetailsPage from './pages/bookings/BookingDetailsPage'
@@ -46,6 +48,8 @@ function App() {
         <Route index element={<HomePage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
+        <Route path="forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="reset-password" element={<ResetPasswordPage />} />
       </Route>
 
       {/* Protected Routes */}

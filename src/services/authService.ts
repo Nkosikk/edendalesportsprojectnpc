@@ -88,6 +88,26 @@ export const authService = {
   getToken(): string | null {
     return localStorage.getItem('accessToken');
   },
+
+  /**
+   * Request password reset email
+   */
+  async forgotPassword(email: string): Promise<ApiResponse<null>> {
+    const response = await apiClient.post<ApiResponse<null>>('/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  /**
+   * Reset password with token
+   */
+  async resetPassword(data: {
+    token: string;
+    password: string;
+    password_confirmation: string;
+  }): Promise<ApiResponse<null>> {
+    const response = await apiClient.post<ApiResponse<null>>('/auth/reset-password', data);
+    return response.data;
+  },
 };
 
 export default authService;
