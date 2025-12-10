@@ -79,63 +79,14 @@ export const paymentService = {
   /**
    * Open PayFast payment gateway
    * This will redirect the user to PayFast payment page
+   * Uses gateway_url and gateway_data from backend response
    */
   redirectToPayment: (gatewayUrl: string, gatewayData: Record<string, any>) => {
-    // Debug: Log environment variables
-    console.log('PayFast Mode:', import.meta.env.VITE_PAYFAST_MODE);
-    console.log('Merchant ID:', import.meta.env.VITE_PAYFAST_MERCHANT_ID);
-    console.log('Merchant Key:', import.meta.env.VITE_PAYFAST_MERCHANT_KEY);
-    console.log('Original Gateway Data from Backend:', gatewayData);
-
-    // Get PayFast configuration based on mode
-    const mode = import.meta.env.VITE_PAYFAST_MODE || 'auto';
-    const sandboxUrl = import.meta.env.VITE_PAYFAST_SANDBOX_URL || 'https://sandbox.payfast.co.za/eng/process';
-    const liveUrl = import.meta.env.VITE_PAYFAST_LIVE_URL || 'https://www.payfast.co.za/eng/process';
-    
-    console.log('PayFast Mode:', mode);
-    console.log('Original Backend Data:', gatewayData);
-    
-    // Only override when in LIVE mode (let backend handle sandbox naturally)
-    if (mode === 'live') {
-      const liveMerchantId = import.meta.env.VITE_PAYFAST_LIVE_MERCHANT_ID;
-      const liveMerchantKey = import.meta.env.VITE_PAYFAST_LIVE_MERCHANT_KEY;
-      
-      if (liveMerchantId && liveMerchantKey) {
-        gatewayData.merchant_id = liveMerchantId;
-        gatewayData.merchant_key = liveMerchantKey;
-        console.log('🔴 LIVE MODE: Overriding with production credentials');
-        console.log('Merchant ID:', liveMerchantId);
-        console.log('Merchant Key:', liveMerchantKey.substring(0, 6) + '...');
-      }
-    } else if (mode === 'sandbox') {
-      console.log('🟡 SANDBOX MODE: Using backend credentials (no override)');
-      console.log('Backend Merchant ID:', gatewayData.merchant_id);
-      console.log('Backend Merchant Key:', gatewayData.merchant_key?.substring(0, 6) + '...');
-    }
-
-    // Determine PayFast URL based on mode
-    const resolveGatewayUrl = () => {
-      if (mode === 'live') {
-        console.log('🔴 Using LIVE URL:', liveUrl);
-        return liveUrl;
-      } else if (mode === 'sandbox') {
-        console.log('🟡 Using SANDBOX URL:', sandboxUrl);
-        return sandboxUrl;
-      }
-      // If mode is 'auto', use backend provided URL as fallback
-      console.log('⚪ Auto mode - using backend URL:', gatewayUrl);
-      return gatewayUrl || liveUrl;
-    };
-
-    const actionUrl = resolveGatewayUrl();
-    console.log('Final PayFast URL:', actionUrl);
-    console.log('Final Gateway Data:', gatewayData);
-
-    // Create form in current window (hidden)
+    // Create form and submit to PayFast
     const form = document.createElement('form');
     form.method = 'POST';
-    form.action = actionUrl;
-    form.target = '_blank'; // This will open in new tab
+    form.action = gatewayUrl;
+    form.target = '_blank';
     form.style.display = 'none';
 
     Object.keys(gatewayData).forEach((key) => {
@@ -148,7 +99,7 @@ export const paymentService = {
 
     document.body.appendChild(form);
     form.submit();
-    document.body.removeChild(form); // Clean up
+    document.body.removeChild(form);
   },
 };
 

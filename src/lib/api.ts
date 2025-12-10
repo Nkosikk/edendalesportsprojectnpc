@@ -1,11 +1,21 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
 import toast from 'react-hot-toast';
 
-// API Configuration
-// Use Vite proxy in development, direct URL in production
-const API_BASE_URL = import.meta.env.DEV 
-  ? '/api'  // Use Vite proxy in development
-  : 'https://www.ndosiautomation.co.za/EDENDALESPORTSPROJECTNPC/api'; // Direct URL in production
+// ============================================
+// API BASE URL CONFIGURATION
+// Uncomment ONE of the following options:
+// ============================================
+
+// PRODUCTION - Edendale Sports (use when deploying to edendalesports.co.za)
+// const API_BASE_URL = 'https://www.edendalesports.co.za/EDENDALESPORTSPROJECTNPC/api';
+
+// DEVELOPMENT/VERCEL - Ndosi Automation (use for local dev & Vercel staging)
+const API_BASE_URL = 'https://www.ndosiautomation.co.za/EDENDALESPORTSPROJECTNPC/api';
+
+// LOCAL PROXY - (use with npm run dev if you want proxy)
+// const API_BASE_URL = '/api';
+
+// ============================================
 
 // Create axios instance
 export const apiClient: AxiosInstance = axios.create({
