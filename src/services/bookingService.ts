@@ -383,9 +383,18 @@ export const bookingService = {
     const holidayFlag = dateObj ? isPublicHoliday(dateObj) : false;
     const weekendOrHoliday = weekendFlag || holidayFlag;
   
-    const requestConfig: Record<string, any> = {};
+    const requestConfig: Record<string, any> = {
+      params: {
+        force_new: 'true',
+        create_new_record: 'true',
+        preserve_cancelled: 'true',
+        allow_duplicate: 'true',
+      }
+    };
+    
     if (weekendOrHoliday) {
       requestConfig.params = {
+        ...requestConfig.params,
         treat_as_weekend: 1,
         ...(holidayFlag && { public_holiday: 1, holiday_override: 1 }),
         override_operating_hours: 1,
@@ -405,8 +414,15 @@ export const bookingService = {
           'X-Allow-Outside-Hours': '1',
           'X-Force-Operating-Hours': '1',
           ...(holidayFlag && { 'X-Holiday-Override': '1' }),
+          'X-Force-New': 'true',
+          'X-Create-New-Record': 'true',
         };
       }
+    } else if (import.meta.env.DEV) {
+      requestConfig.headers = {
+        'X-Force-New': 'true',
+        'X-Create-New-Record': 'true',
+      };
     }
   
     const attemptCreate = async (body: typeof payload, config?: Record<string, any>) => {
@@ -453,7 +469,7 @@ export const bookingService = {
     }
 
     try {
-      return await attemptCreate(payload, Object.keys(requestConfig).length ? requestConfig : undefined);
+      return await attemptCreate(payload, requestConfig);
     } catch (error: any) {
       const message = error?.response?.data?.message || error?.message || 'Failed to create booking';
       const enhancedError = new Error(message);

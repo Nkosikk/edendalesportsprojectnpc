@@ -1,7 +1,12 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { User, UserRole, LoginRequest, RegisterRequest, ApiResponse, AuthResponse } from '../types';
 import { apiClient, handleApiResponse } from '../lib/api';
 import toast from 'react-hot-toast';
+
+// Inactivity timeout in milliseconds (15 minutes)
+const INACTIVITY_TIMEOUT = 15 * 60 * 1000;
+// Warning before logout (1 minute before timeout)
+const WARNING_BEFORE_LOGOUT = 60 * 1000;
 
 interface AuthContextType {
   user: User | null;
@@ -32,6 +37,137 @@ interface AuthProviderProps {
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const warningTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const warningShownRef = useRef(false);
+
+  // Logout function (defined early so it can be used by inactivity handler)
+  const logout = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('accessToken');
+    // Clear inactivity timers
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+    if (warningTimerRef.current) {
+      clearTimeout(warningTimerRef.current);
+      warningTimerRef.current = null;
+    }
+    warningShownRef.current = false;
+    toast.success('Logged out successfully');
+  }, []);
+
+  // Handle inactivity logout with automatic redirect
+  const handleInactivityLogout = useCallback(() => {
+    setUser(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('accessToken');
+    // Clear timers
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+    if (warningTimerRef.current) {
+      clearTimeout(warningTimerRef.current);
+      warningTimerRef.current = null;
+    }
+    warningShownRef.current = false;
+    toast.error('Session expired due to inactivity. Please log in again.', { duration: 5000 });
+    // Automatically redirect to login page
+    window.location.href = '/login';
+  }, []);
+
+  // Reset inactivity timer on user activity
+  const resetInactivityTimer = useCallback(() => {
+    // Only track activity if user is logged in
+    if (!localStorage.getItem('accessToken')) return;
+
+    // Clear existing timers
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+    }
+    if (warningTimerRef.current) {
+      clearTimeout(warningTimerRef.current);
+    }
+    warningShownRef.current = false;
+
+    // Set warning timer (fires 1 minute before logout)
+    warningTimerRef.current = setTimeout(() => {
+      if (!warningShownRef.current && localStorage.getItem('accessToken')) {
+        warningShownRef.current = true;
+        toast('Your session will expire in 1 minute due to inactivity.', {
+          icon: '⚠️',
+          duration: 10000,
+          id: 'inactivity-warning',
+        });
+      }
+    }, INACTIVITY_TIMEOUT - WARNING_BEFORE_LOGOUT);
+
+    // Set logout timer
+    inactivityTimerRef.current = setTimeout(() => {
+      if (localStorage.getItem('accessToken')) {
+        handleInactivityLogout();
+      }
+    }, INACTIVITY_TIMEOUT);
+  }, [handleInactivityLogout]);
+
+  // Set up activity listeners
+  useEffect(() => {
+    const activityEvents = [
+      'mousedown',
+      'mousemove',
+      'keydown',
+      'scroll',
+      'touchstart',
+      'click',
+      'wheel',
+    ];
+
+    // Throttle activity reset to avoid excessive timer resets
+    let lastActivity = Date.now();
+    const throttledReset = () => {
+      const now = Date.now();
+      // Only reset if more than 1 second has passed since last reset
+      if (now - lastActivity > 1000) {
+        lastActivity = now;
+        resetInactivityTimer();
+      }
+    };
+
+    // Add event listeners
+    activityEvents.forEach(event => {
+      window.addEventListener(event, throttledReset, { passive: true });
+    });
+
+    // Also listen for visibility change (user switches back to tab)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && localStorage.getItem('accessToken')) {
+        resetInactivityTimer();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Start inactivity timer if user is already logged in
+    if (localStorage.getItem('accessToken')) {
+      resetInactivityTimer();
+    }
+
+    // Cleanup
+    return () => {
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, throttledReset);
+      });
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (inactivityTimerRef.current) {
+        clearTimeout(inactivityTimerRef.current);
+      }
+      if (warningTimerRef.current) {
+        clearTimeout(warningTimerRef.current);
+      }
+    };
+  }, [resetInactivityTimer]);
 
   useEffect(() => {
     // Check if user is logged in on app start
@@ -115,6 +251,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       throw error;
     } finally {
       setLoading(false);
+      // Start inactivity timer after successful login
+      if (localStorage.getItem('accessToken')) {
+        resetInactivityTimer();
+      }
     }
   };
 
@@ -133,6 +273,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       setUser(newUser);
       toast.success('Registration successful!');
+
+      // Start inactivity timer after successful registration
+      resetInactivityTimer();
 
       // Check for pending booking and redirect if found
       const pendingBooking = localStorage.getItem('pendingBooking');
@@ -167,14 +310,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     } finally {
       setLoading(false);
     }
-  };
-
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('user');
-    localStorage.removeItem('accessToken');
-    // no refresh token in current API
-    toast.success('Logged out successfully');
   };
 
   const updateProfile = async (userData: Partial<User>) => {

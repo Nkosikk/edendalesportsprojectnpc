@@ -732,20 +732,155 @@ const BookingsManagementPage: React.FC = () => {
       <html>
         <head>
           <title>Bookings Report</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <style>
-            body { font-family: Arial, sans-serif; margin: 20px; }
-            table { width: 100%; border-collapse: collapse; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; }
-            .header { text-align: center; margin-bottom: 20px; }
+            * { box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; margin: 0; padding: 15px; font-size: 14px; }
+            
+            /* Header styles */
+            .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #1d4ed8; padding-bottom: 15px; margin-bottom: 20px; flex-wrap: wrap; gap: 10px; }
+            .header-left { display: flex; align-items: center; gap: 12px; }
+            .logo { width: 60px; height: auto; object-fit: contain; }
+            .company-name { font-size: 18px; font-weight: bold; color: #1f2937; margin: 0; }
+            .company-tagline { font-size: 11px; color: #6b7280; margin: 2px 0 0; }
+            .header-right { text-align: right; }
+            .report-title { font-size: 16px; font-weight: bold; color: #1d4ed8; margin: 0; }
+            .report-date { font-size: 11px; color: #6b7280; margin: 5px 0 0; }
+            
+            /* Summary styles */
+            .summary { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 20px; }
+            .summary-item { background: #f3f4f6; padding: 10px 12px; border-radius: 8px; border-left: 3px solid #1d4ed8; }
+            .summary-label { font-size: 10px; color: #6b7280; text-transform: uppercase; }
+            .summary-value { font-size: 16px; font-weight: bold; color: #1f2937; }
+            
+            /* Desktop table - hidden on mobile */
+            .desktop-table { display: none; }
+            
+            /* Mobile card view */
+            .mobile-cards { display: block; }
+            .booking-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+            .booking-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #f3f4f6; }
+            .booking-ref { font-weight: bold; color: #1d4ed8; font-size: 13px; }
+            .booking-card-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }
+            .booking-card-label { color: #6b7280; }
+            .booking-card-value { font-weight: 500; color: #1f2937; text-align: right; }
+            .booking-card-badges { display: flex; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid #f3f4f6; }
+            
+            /* Status badges */
+            .status-badge { padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; display: inline-block; }
+            .status-confirmed { background: #dcfce7; color: #166534; }
+            .status-pending { background: #fef9c3; color: #854d0e; }
+            .status-cancelled { background: #fee2e2; color: #991b1b; }
+            .status-completed { background: #dbeafe; color: #1e40af; }
+            .payment-paid { background: #dcfce7; color: #166534; }
+            .payment-pending { background: #fef9c3; color: #854d0e; }
+            .payment-failed { background: #fee2e2; color: #991b1b; }
+            
+            /* Footer */
+            .footer { margin-top: 25px; padding-top: 15px; border-top: 1px solid #e5e7eb; text-align: center; font-size: 10px; color: #6b7280; }
+            .footer p { margin: 4px 0; }
+            
+            /* Tablet and up (600px+) */
+            @media screen and (min-width: 600px) {
+              body { padding: 20px; }
+              .logo { width: 70px; }
+              .company-name { font-size: 20px; }
+              .summary { grid-template-columns: repeat(4, 1fr); }
+              .mobile-cards { display: none; }
+              .desktop-table { display: table; width: 100%; border-collapse: collapse; margin-top: 15px; }
+              .desktop-table th, .desktop-table td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
+              .desktop-table th { background-color: #1d4ed8; color: white; font-weight: 600; }
+              .desktop-table tr:nth-child(even) { background-color: #f9fafb; }
+            }
+            
+            /* Desktop (900px+) */
+            @media screen and (min-width: 900px) {
+              body { padding: 25px; }
+              .logo { width: 80px; }
+              .company-name { font-size: 22px; }
+              .report-title { font-size: 18px; }
+            }
+            
+            /* Print styles */
+            @media print {
+              body { margin: 10px; padding: 10px; }
+              .header { page-break-after: avoid; }
+              .mobile-cards { display: none !important; }
+              .desktop-table { display: table !important; }
+              .desktop-table { page-break-inside: auto; }
+              .desktop-table tr { page-break-inside: avoid; }
+              .booking-card { page-break-inside: avoid; }
+            }
           </style>
         </head>
         <body>
           <div class="header">
-            <h1>Bookings Report</h1>
-            <p>Generated on ${new Date().toLocaleDateString()}</p>
+            <div class="header-left">
+              <img src="/images/ESP-BLUE-2.png" alt="Edendale Sports Complex Logo" class="logo" />
+              <div>
+                <h1 class="company-name">Edendale Sports Complex</h1>
+                <p class="company-tagline">Sports Facility Management</p>
+              </div>
+            </div>
+            <div class="header-right">
+              <h2 class="report-title">Bookings Report</h2>
+              <p class="report-date">Generated on ${new Date().toLocaleDateString('en-ZA', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+            </div>
           </div>
-          <table>
+          
+          <div class="summary">
+            <div class="summary-item">
+              <div class="summary-label">Total Bookings</div>
+              <div class="summary-value">${bookings.length}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Total Revenue</div>
+              <div class="summary-value">R${bookings.reduce((sum, b) => sum + (Number(b.total_amount) || 0), 0).toFixed(2)}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Confirmed</div>
+              <div class="summary-value">${bookings.filter(b => b.status === 'confirmed').length}</div>
+            </div>
+            <div class="summary-item">
+              <div class="summary-label">Pending</div>
+              <div class="summary-value">${bookings.filter(b => b.status === 'pending').length}</div>
+            </div>
+          </div>
+          
+          <!-- Mobile Card View -->
+          <div class="mobile-cards">
+            ${bookings.map(booking => `
+              <div class="booking-card">
+                <div class="booking-card-header">
+                  <span class="booking-ref">${booking.booking_reference || '-'}</span>
+                  <span>R${Number(booking.total_amount || 0).toFixed(2)}</span>
+                </div>
+                <div class="booking-card-row">
+                  <span class="booking-card-label">Customer</span>
+                  <span class="booking-card-value">${booking.first_name || ''} ${booking.last_name || ''}</span>
+                </div>
+                <div class="booking-card-row">
+                  <span class="booking-card-label">Field</span>
+                  <span class="booking-card-value">${booking.field_name || '-'}</span>
+                </div>
+                <div class="booking-card-row">
+                  <span class="booking-card-label">Date</span>
+                  <span class="booking-card-value">${booking.booking_date || '-'}</span>
+                </div>
+                <div class="booking-card-row">
+                  <span class="booking-card-label">Time</span>
+                  <span class="booking-card-value">${booking.start_time || '-'} - ${booking.end_time || '-'}</span>
+                </div>
+                <div class="booking-card-badges">
+                  <span class="status-badge status-${(booking.status || 'pending').toLowerCase()}">${booking.status || 'pending'}</span>
+                  <span class="status-badge payment-${(booking.payment_status || 'pending').toLowerCase()}">${booking.payment_status || 'pending'}</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+          
+          <!-- Desktop Table View -->
+          <table class="desktop-table">
             <thead>
               <tr>
                 <th>Reference</th>
@@ -761,18 +896,24 @@ const BookingsManagementPage: React.FC = () => {
             <tbody>
               ${bookings.map(booking => `
                 <tr>
-                  <td>${booking.booking_reference}</td>
-                  <td>${booking.first_name} ${booking.last_name}</td>
-                  <td>${booking.field_name}</td>
-                  <td>${booking.booking_date}</td>
-                  <td>${booking.start_time} - ${booking.end_time}</td>
-                  <td>R${booking.total_amount}</td>
-                  <td>${booking.status}</td>
-                  <td>${booking.payment_status}</td>
+                  <td>${booking.booking_reference || '-'}</td>
+                  <td>${booking.first_name || ''} ${booking.last_name || ''}</td>
+                  <td>${booking.field_name || '-'}</td>
+                  <td>${booking.booking_date || '-'}</td>
+                  <td>${booking.start_time || '-'} - ${booking.end_time || '-'}</td>
+                  <td>R${Number(booking.total_amount || 0).toFixed(2)}</td>
+                  <td><span class="status-badge status-${(booking.status || 'pending').toLowerCase()}">${booking.status || 'pending'}</span></td>
+                  <td><span class="status-badge payment-${(booking.payment_status || 'pending').toLowerCase()}">${booking.payment_status || 'pending'}</span></td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
+          
+          <div class="footer">
+            <p><strong>Edendale Sports Complex</strong></p>
+            <p>123 Sports Avenue, Edendale, Pietermaritzburg • Tel: +27 33 123 4567</p>
+            <p>This report was automatically generated by the booking management system.</p>
+          </div>
         </body>
       </html>
     `;
