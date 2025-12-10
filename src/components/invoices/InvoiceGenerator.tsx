@@ -127,7 +127,7 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                 <td className="px-1 py-0.5">
                   <div className="font-semibold text-gray-900 truncate max-w-[80px] sm:max-w-none">{invoiceData.field_name}</div>
                   <div className="text-[9px] sm:text-xs text-gray-600 capitalize">
-                    {invoiceData.sport_type.replace('_', ' ')}
+                    {invoiceData.sport_type ? invoiceData.sport_type.replace('_', ' ') : 'N/A'}
                   </div>
                   <div className="text-[9px] text-gray-500 sm:hidden">
                     {formatDate(invoiceData.booking_date)}
