@@ -57,6 +57,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
     warningShownRef.current = false;
     toast.success('Logged out successfully');
+    // Redirect to login without saving current location
+    // This ensures next login goes to dashboard, not back to the previous page
+    window.location.href = '/login';
   }, []);
 
   // Handle inactivity logout with automatic redirect
