@@ -1,9 +1,74 @@
 import { BookingDetails } from '../types';
 import { safeNumber } from '../lib/utils';
+import apiClient, { handleApiResponse } from '../lib/api';
 
+interface SendInvoiceRequest {
+  recipient_email?: string;
+  subject?: string;
+  message?: string;
+  include_payment_link?: boolean;
+  invoice_html?: string;
+}
 
+interface SendInvoiceResponse {
+  success: boolean;
+  message: string;
+  email_id?: string;
+}
 
 class InvoiceService {
+  /**
+   * Get invoice HTML content for email attachment
+   */
+  getInvoiceHtmlContent(): string | null {
+    const element = document.getElementById('invoice-content');
+    if (!element) return null;
+    
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Invoice</title>
+          <style>
+            ${this.getInvoiceStyles()}
+          </style>
+        </head>
+        <body>
+          ${element.innerHTML}
+        </body>
+      </html>
+    `;
+  }
+
+  /**
+   * Send invoice via email for a booking
+   * Endpoint: POST /bookings/{id}/send-invoice
+   * 
+   * Note: The backend is responsible for:
+   * - Generating PDF from invoice_html
+   * - Creating a payment link if include_payment_link is true
+   * - Sending the email with PDF attachment and payment link
+   */
+  async sendInvoice(bookingId: number, options?: SendInvoiceRequest): Promise<SendInvoiceResponse> {
+    try {
+      // Get invoice HTML for PDF generation on server
+      const invoiceHtml = this.getInvoiceHtmlContent();
+      
+      const response = await apiClient.post(`/bookings/${bookingId}/send-invoice`, {
+        recipient_email: options?.recipient_email,
+        subject: options?.subject,
+        message: options?.message,
+        include_payment_link: options?.include_payment_link ?? true,
+        invoice_html: invoiceHtml,
+      });
+      // Don't show success toast here - let the caller handle it to avoid duplicates
+      return handleApiResponse<SendInvoiceResponse>(response, false);
+    } catch (error: any) {
+      const message = error?.response?.data?.message || error?.message || 'Failed to send invoice';
+      throw new Error(message);
+    }
+  }
   /**
    * Generate and download PDF invoice using browser print
    */
