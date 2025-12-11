@@ -268,7 +268,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 className="w-full sm:w-auto px-4 sm:px-6"
                 size="sm"
               >
-                Quick Send
+                Email Invoice
               </Button>
               {/* Hidden until backend is implemented
               <Button

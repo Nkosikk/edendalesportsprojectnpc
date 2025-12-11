@@ -166,7 +166,7 @@ const InvoicePage: React.FC = () => {
               variant="outline"
               loading={sending && !showEmailForm}
             >
-              Quick Send
+              Email Invoice
             </Button>
             {/* Hidden until backend is implemented
             <Button 
