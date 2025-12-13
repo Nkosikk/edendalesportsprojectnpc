@@ -16,7 +16,7 @@ const initialState: CreateFieldRequest = {
   description: '',
   sport_type: 'multipurpose',
   capacity: 0,
-  hourly_rate: 400,
+  hourly_rate: 420,
   facilities: '',
   rules: '',
 };

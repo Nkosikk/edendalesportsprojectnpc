@@ -5,17 +5,17 @@ import Footer from './Footer';
 import { useAnnouncement } from '../../contexts/AnnouncementContext';
 
 const Layout = () => {
-  // Check sessionStorage to show POPIA notice only once per session
+  // Check localStorage to show POPIA notice only once (persists across sessions)
   const [showPopia, setShowPopia] = useState(() => {
     if (typeof window !== 'undefined') {
-      const acknowledged = sessionStorage.getItem('popia_acknowledged');
+      const acknowledged = localStorage.getItem('popia_acknowledged');
       return !acknowledged;
     }
     return true;
   });
 
   const handleAcknowledge = () => {
-    sessionStorage.setItem('popia_acknowledged', 'true');
+    localStorage.setItem('popia_acknowledged', 'true');
     setShowPopia(false);
   };
   const { announcement } = useAnnouncement();
