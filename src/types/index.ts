@@ -209,16 +209,31 @@ export interface BookingAnalytics {
   period: {
     from_date: string;
     to_date: string;
-    total_days: number;
+    total_days?: number;
   };
-  overall_stats: {
+  filters?: {
+    from_date: string;
+    to_date: string;
+    field_id: number | null;
+    status: string | null;
+    payment_status: string | null;
+  };
+  // API returns booking_stats, but we also support overall_stats for compatibility
+  booking_stats?: {
     total_bookings: number;
-    total_hours: number;
-    total_revenue: number;
+    total_hours: number | string;
+    total_revenue: number | string;
     confirmed_bookings: number;
     cancelled_bookings: number;
-    confirmation_rate: number;
-    average_booking_value: number;
+  };
+  overall_stats?: {
+    total_bookings: number;
+    total_hours: number | string;
+    total_revenue: number | string;
+    confirmed_bookings: number;
+    cancelled_bookings: number;
+    confirmation_rate?: number;
+    average_booking_value?: number;
   };
   booking_trends: Array<{
     date: string;
@@ -230,18 +245,19 @@ export interface BookingAnalytics {
   peak_hours: Array<{
     hour: number;
     bookings: number;
-    revenue: number;
+    revenue: number | string;
   }>;
   field_utilization: Array<{
     id: number;
     field_name: string;
-    sport_type: string;
+    field_type?: string;
+    sport_type?: string;
     total_bookings: number;
-    booked_hours: number;
+    booked_hours: number | string;
     available_hours_period: number;
     utilization_percentage: number;
   }>;
-  status_distribution: Array<{
+  status_distribution?: Array<{
     status: string;
     count: number;
     percentage: number;
@@ -252,9 +268,9 @@ export interface BookingAnalytics {
     customer_cancellations: number;
     admin_cancellations: number;
     cancellation_rate: number;
-    avg_hours_before_cancellation: number;
+    avg_hours_before_cancellation: number | null;
   };
-  duration_analysis: Array<{
+  duration_analysis?: Array<{
     duration_category: string;
     bookings: number;
     avg_amount: number;

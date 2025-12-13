@@ -8,8 +8,22 @@ import PeakHoursBar from '../../components/admin/charts/PeakHoursBar';
 import FieldUtilizationBar from '../../components/admin/charts/FieldUtilizationBar';
 import Button from '../../components/ui/Button';
 
+// Helper to get date string in YYYY-MM-DD format
+const formatDate = (date: Date): string => date.toISOString().split('T')[0];
+
+// Get default date range: first of current month to 3 months ahead
+const getDefaultFilters = (): ReportFilters => {
+  const now = new Date();
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const threeMonthsAhead = new Date(now.getFullYear(), now.getMonth() + 3, 0); // Last day of month 3 months from now
+  return {
+    from_date: formatDate(firstOfMonth),
+    to_date: formatDate(threeMonthsAhead),
+  };
+};
+
 const ReportsAnalyticsPage: React.FC = () => {
-  const [filters, setFilters] = useState<ReportFilters>({});
+  const [filters, setFilters] = useState<ReportFilters>(getDefaultFilters());
   const [analytics, setAnalytics] = useState<BookingAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -41,9 +55,11 @@ const ReportsAnalyticsPage: React.FC = () => {
     return acc;
   }, {});
 
-  const fallbackConfirmed = analytics?.overall_stats?.confirmed_bookings ?? 0;
-  const fallbackCancelled = analytics?.overall_stats?.cancelled_bookings ?? 0;
-  const totalBookingsReported = analytics?.overall_stats?.total_bookings ?? 0;
+  // Support both booking_stats (from API) and overall_stats (legacy)
+  const stats = analytics?.booking_stats ?? analytics?.overall_stats;
+  const fallbackConfirmed = stats?.confirmed_bookings ?? 0;
+  const fallbackCancelled = stats?.cancelled_bookings ?? 0;
+  const totalBookingsReported = stats?.total_bookings ?? 0;
 
   const paidEligible = paidBookingsRaw > 0 ? paidBookingsRaw : fallbackConfirmed;
   const statusEligible = (statusMap['confirmed'] ?? 0) + (statusMap['completed'] ?? 0);
@@ -79,8 +95,8 @@ const ReportsAnalyticsPage: React.FC = () => {
     return sum + (Number.isFinite(hours) ? hours : 0);
   }, 0);
 
-  const fallbackRevenue = analytics?.overall_stats?.total_revenue ?? 0;
-  const fallbackHours = analytics?.overall_stats?.total_hours ?? 0;
+  const fallbackRevenue = Number(stats?.total_revenue ?? 0);
+  const fallbackHours = Number(stats?.total_hours ?? 0);
 
   const confirmedRevenue = confirmedRevenueRaw > 0 ? confirmedRevenueRaw : fallbackRevenue;
   const paidHours = hoursFromPeak > 0
@@ -134,7 +150,7 @@ const ReportsAnalyticsPage: React.FC = () => {
           <Card>
             <CardHeader><CardTitle>Peak Hours</CardTitle></CardHeader>
             <CardContent>
-              <PeakHoursBar data={analytics.peak_hours} />
+              <PeakHoursBar data={analytics.peak_hours.map(h => ({ ...h, revenue: Number(h.revenue) }))} />
             </CardContent>
           </Card>
           <Card>

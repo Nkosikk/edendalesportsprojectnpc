@@ -8,8 +8,22 @@ import PaymentMethodsPie from '../../components/admin/charts/PaymentMethodsPie';
 import RevenueTimelineLine from '../../components/admin/charts/RevenueTimelineLine';
 import Button from '../../components/ui/Button';
 
+// Helper to get date string in YYYY-MM-DD format
+const formatDate = (date: Date): string => date.toISOString().split('T')[0];
+
+// Get default date range: first of current month to 3 months ahead
+const getDefaultFilters = (): ReportFilters => {
+  const now = new Date();
+  const firstOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const threeMonthsAhead = new Date(now.getFullYear(), now.getMonth() + 3, 0);
+  return {
+    from_date: formatDate(firstOfMonth),
+    to_date: formatDate(threeMonthsAhead),
+  };
+};
+
 const ReportsRevenuePage: React.FC = () => {
-  const [filters, setFilters] = useState<ReportFilters>({});
+  const [filters, setFilters] = useState<ReportFilters>(getDefaultFilters());
   const [report, setReport] = useState<RevenueReport | null>(null);
   const [analytics, setAnalytics] = useState<BookingAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,17 +101,20 @@ const ReportsRevenuePage: React.FC = () => {
     return sum + (Number.isFinite(revenue) ? revenue : 0);
   }, 0);
 
-  const fallbackRevenue = analytics?.overall_stats?.total_revenue ?? 0;
+  const fallbackRevenue = Number(analytics?.booking_stats?.total_revenue ?? analytics?.overall_stats?.total_revenue ?? 0);
   const confirmedRevenueFromMethods = confirmedMethods.reduce((sum, method) => {
     const amount = Number(method.total_amount ?? 0);
     return sum + (Number.isFinite(amount) ? amount : 0);
   }, 0);
 
-  const confirmedRevenue = confirmedRevenueRaw > 0
+  const confirmedRevenueValue = confirmedRevenueRaw > 0
     ? confirmedRevenueRaw
     : fallbackRevenue > 0
       ? fallbackRevenue
       : confirmedRevenueFromMethods;
+
+  // Ensure confirmedRevenue is always a number
+  const confirmedRevenue = Number(confirmedRevenueValue);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-screen-xl">
