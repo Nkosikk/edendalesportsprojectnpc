@@ -15,40 +15,56 @@ const PaymentStatusPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const payment_reference = params.get('payment_reference') || undefined;
+  const payment_reference = params.get('payment_reference') || params.get('pf_payment_id') || undefined;
   const booking_id = params.get('booking_id') ? Number(params.get('booking_id')) : undefined;
-  const isCancelFlow = location.pathname.includes('/payments/cancel');
+  
+  // Detect flow type from URL path
+  const isSuccessFlow = location.pathname.includes('/success');
+  const isCancelFlow = location.pathname.includes('/cancel');
 
   useEffect(() => {
     const load = async () => {
       try {
         setLoading(true);
-        const data = await paymentService.getPaymentStatus(payment_reference, booking_id);
-        setStatus(data);
         
-        // Show appropriate toast based on payment status
-        if (data?.payment?.status === 'completed') {
-          toast.success('Payment successful! Your booking is confirmed.');
-        } else if (data?.payment?.status === 'failed' || isCancelFlow) {
-          toast.error('Payment was cancelled or failed.');
+        // If we have payment reference or booking ID, try to fetch status
+        if (payment_reference || booking_id) {
+          const data = await paymentService.getPaymentStatus(payment_reference, booking_id);
+          setStatus(data);
+          
+          // Show appropriate toast based on payment status
+          if (data?.payment?.status === 'completed') {
+            toast.success('Payment successful! Your booking is confirmed.');
+          } else if (data?.payment?.status === 'failed' || isCancelFlow) {
+            toast.error('Payment was cancelled or failed.');
+          }
+        } else if (isSuccessFlow) {
+          // PayFast returned to success URL but didn't pass reference
+          // Show success message anyway - ITN will update the actual status
+          toast.success('Payment completed! Your booking will be confirmed shortly.');
+        } else if (isCancelFlow) {
+          toast.error('Payment was cancelled.');
         }
       } finally {
         setLoading(false);
       }
     };
     
-    if (payment_reference || booking_id) {
-      load();
-    } else {
-      setLoading(false);
-    }
-  }, [payment_reference, booking_id, isCancelFlow]);
+    load();
+  }, [payment_reference, booking_id, isCancelFlow, isSuccessFlow]);
 
   const handleBackToDashboard = () => {
     navigate('/app');
   };
 
   const getStatusIcon = (paymentStatus?: string) => {
+    // Use URL path to determine status if no payment data
+    if (!paymentStatus) {
+      if (isSuccessFlow) return <CheckCircle className="h-8 w-8 text-green-600" />;
+      if (isCancelFlow) return <XCircle className="h-8 w-8 text-red-600" />;
+      return <Clock className="h-8 w-8 text-gray-600" />;
+    }
+    
     switch (paymentStatus) {
       case 'completed':
         return <CheckCircle className="h-8 w-8 text-green-600" />;
@@ -62,6 +78,13 @@ const PaymentStatusPage: React.FC = () => {
   };
 
   const getStatusMessage = (paymentStatus?: string) => {
+    // Use URL path to determine message if no payment data
+    if (!paymentStatus) {
+      if (isSuccessFlow) return 'Payment completed! Your booking will be confirmed shortly.';
+      if (isCancelFlow) return 'Payment was cancelled.';
+      return 'Payment status unknown';
+    }
+    
     if (isCancelFlow) return 'Payment was cancelled';
     switch (paymentStatus) {
       case 'completed':
@@ -84,7 +107,7 @@ const PaymentStatusPage: React.FC = () => {
         <CardContent>
           {loading ? (
             <div className="flex justify-center py-8"><LoadingSpinner /></div>
-          ) : !status && !isCancelFlow ? (
+          ) : !status && !isCancelFlow && !isSuccessFlow ? (
             <div className="text-center py-8">
               <p className="text-gray-500 mb-4">No payment information found.</p>
               <Button onClick={handleBackToDashboard}>Back to Dashboard</Button>
@@ -99,6 +122,11 @@ const PaymentStatusPage: React.FC = () => {
                 <h3 className="text-lg font-semibold mb-2">
                   {getStatusMessage(status?.payment?.status)}
                 </h3>
+                {isSuccessFlow && !status && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    Your payment has been received. The booking confirmation will be processed automatically.
+                  </p>
+                )}
               </div>
 
               {/* Payment Details */}

@@ -7,7 +7,6 @@ import { invoiceService } from '../../services/invoiceService';
 
 import toast from 'react-hot-toast';
 import { Download, FileText, Send, Mail, LinkIcon, FileCheck } from 'lucide-react';
-import { getRefundAdjustedAmount, getExplicitRefundAmount, formatCurrency } from '../../lib/utils';
 
 interface InvoiceModalProps {
   isOpen: boolean;
@@ -85,9 +84,7 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
 
 
   const validation = invoiceService.validateInvoiceData(booking);
-  const adjustedAmount = getRefundAdjustedAmount(booking);
-  const refundDue = getExplicitRefundAmount(booking);
-  const invoiceTotals = invoiceService.calculateInvoiceTotals(Math.abs(adjustedAmount));
+  const invoiceTotals = invoiceService.calculateInvoiceTotals(booking.total_amount || 0);
   const invoiceStatus = invoiceService.getInvoiceStatus(booking);
 
   if (!validation.isValid) {
@@ -130,11 +127,6 @@ const InvoiceModal: React.FC<InvoiceModalProps> = ({
               <p><span className="text-gray-600">Subtotal:</span> R{(invoiceTotals.subtotal || 0).toFixed(2)}</p>
               <p><span className="text-gray-600">VAT (0%):</span> R{(invoiceTotals.vat || 0).toFixed(2)}</p>
               <p className="font-medium"><span className="text-gray-600">Total:</span> R{(invoiceTotals.total || 0).toFixed(2)}</p>
-              {adjustedAmount < 0 && (
-                <p className="text-xs font-semibold text-red-600 mt-1">
-                  Refund owed {refundDue ? `(${formatCurrency(refundDue)})` : ''}
-                </p>
-              )}
             </div>
           </div>
         </div>

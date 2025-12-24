@@ -4,8 +4,6 @@ import {
   formatCurrency,
   formatDate,
   formatTime,
-  getRefundAdjustedAmount,
-  getExplicitRefundAmount,
 } from '../../lib/utils';
 import { invoiceService } from '../../services/invoiceService';
 
@@ -50,9 +48,7 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
     dueDate: booking.status === 'pending' ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] : undefined,
     companyInfo: defaultCompanyInfo
   };
-  const lineAmount = getRefundAdjustedAmount(booking);
-  const displayAmount = Math.abs(lineAmount);
-  const refundDue = getExplicitRefundAmount(booking);
+  const displayAmount = booking.total_amount || 0;
   const invoiceTotals = invoiceService.calculateInvoiceTotals(displayAmount, 0);
   const paymentStatusMap: Record<string, { label: string; dotClass: 'paid' | 'pending' | 'unpaid'; textClass: 'paid' | 'pending' | 'unpaid'; cardModifier?: 'status-paid' | 'status-pending' | 'status-unpaid'; }> = {
     paid: { label: 'PAID', dotClass: 'paid', textClass: 'paid', cardModifier: 'status-paid' },
@@ -173,13 +169,6 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
                 <span className="text-primary-700">{formatCurrency(invoiceTotals.total)}</span>
               </div>
             </div>
-            {lineAmount < 0 && (
-              <div className="bg-red-100 p-1 rounded text-xs refund-card">
-                <p className="text-red-800 font-semibold">
-                  Refund: {refundDue ? formatCurrency(refundDue) : formatCurrency(Math.abs(lineAmount))}
-                </p>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -199,11 +188,11 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
         </div>
 
         {/* Payment Instructions or Notice */}
-        {lineAmount < 0 ? (
-          <div className="invoice-payment-card refund-card">
-            <h4 className="font-semibold mb-0 text-xs">Refund Notice</h4>
-            <p className="text-xs">
-              Refund <span className="font-bold">{refundDue ? formatCurrency(refundDue) : formatCurrency(Math.abs(lineAmount))}</span> processing 3-5 days.
+        {invoiceData.status === 'cancelled' ? (
+          <div className="invoice-payment-card bg-gray-100 border border-gray-300 rounded p-1">
+            <h4 className="font-semibold mb-0 text-xs text-gray-700">Booking Cancelled</h4>
+            <p className="text-xs text-gray-600">
+              This booking has been cancelled. <span className="font-semibold">No refunds are available.</span>
             </p>
           </div>
         ) : invoiceData.payment_status !== 'paid' ? (
@@ -224,7 +213,8 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
       </div>
 
       {/* Footer */}
-      <div className="text-center border-t border-gray-200 pt-0 invoice-footer">
+      <div className="text-center border-t border-gray-200 pt-1 invoice-footer">
+        <p className="text-gray-500 text-[9px] mb-0.5">All payments are final. No refunds or cancellation credits are available.</p>
         <p className="text-primary-900 font-medium text-xs">Thank you for choosing {invoiceData.companyInfo.name}!</p>
       </div>
     </div>

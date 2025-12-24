@@ -65,6 +65,10 @@ function App() {
         <Route path="payments/return" element={<PaymentStatusPage />} />
         <Route path="payments/cancel" element={<PaymentStatusPage />} />
         <Route path="payments/notify" element={<PaymentStatusPage />} />
+        {/* PayFast return URLs */}
+        <Route path="payment/success" element={<PaymentStatusPage />} />
+        <Route path="payment/cancel" element={<PaymentStatusPage />} />
+        <Route path="payment/notify" element={<PaymentStatusPage />} />
         <Route path="invoices/:id" element={<InvoicePage />} />
       </Route>
 
