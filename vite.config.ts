@@ -5,6 +5,8 @@ import path from 'path'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
+  // Base path for production deployment on edendalesports.co.za
+  base: '/EDENDALESPORTSPROJECTNPC/',
   // Store Vite's cache outside node_modules to avoid EACCES issues
   cacheDir: '.vite',
   resolve: {
