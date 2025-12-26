@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Successful - Edendale Sports</title>
+  <link rel="icon" type="image/png" href="/EDENDALESPORTSPROJECTNPC/images/ESP-BLUE-2.png">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+      max-width: 500px;
+      width: 100%;
+      overflow: hidden;
+    }
+    .header {
+      background: #16a34a;
+      color: white;
+      padding: 24px;
+      text-align: center;
+    }
+    .header h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+    }
+    .icon {
+      width: 64px;
+      height: 64px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 16px;
+    }
+    .icon svg {
+      width: 32px;
+      height: 32px;
+    }
+    .content {
+      padding: 24px;
+    }
+    .message {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+    .message h2 {
+      color: #16a34a;
+      font-size: 20px;
+      margin-bottom: 12px;
+    }
+    .message p {
+      color: #4b5563;
+      line-height: 1.6;
+    }
+    .confirmation-box {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    .confirmation-box .check-icon {
+      width: 48px;
+      height: 48px;
+      background: #16a34a;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 12px;
+    }
+    .confirmation-box .check-icon svg {
+      width: 24px;
+      height: 24px;
+      color: white;
+    }
+    .confirmation-box h3 {
+      color: #15803d;
+      font-size: 16px;
+      margin-bottom: 8px;
+    }
+    .confirmation-box p {
+      color: #166534;
+      font-size: 14px;
+    }
+    .next-steps {
+      background: #f9fafb;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 24px;
+    }
+    .next-steps h3 {
+      font-size: 16px;
+      color: #111827;
+      margin-bottom: 12px;
+    }
+    .step {
+      display: flex;
+      gap: 12px;
+      padding: 12px;
+      background: white;
+      border-radius: 8px;
+      border: 1px solid #e5e7eb;
+      margin-bottom: 8px;
+    }
+    .step:last-child {
+      margin-bottom: 0;
+    }
+    .step-number {
+      width: 24px;
+      height: 24px;
+      background: #2563eb;
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .step-text {
+      font-size: 14px;
+      color: #4b5563;
+    }
+    .buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 24px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s;
+      cursor: pointer;
+      border: none;
+    }
+    .btn-primary {
+      background: #16a34a;
+      color: white;
+    }
+    .btn-primary:hover {
+      background: #15803d;
+    }
+    .btn-outline {
+      background: white;
+      color: #374151;
+      border: 1px solid #d1d5db;
+    }
+    .btn-outline:hover {
+      background: #f9fafb;
+    }
+    .footer {
+      text-align: center;
+      padding: 16px 24px 24px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .footer p {
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .footer a {
+      color: #2563eb;
+      text-decoration: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="icon">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
+      <h1>Payment Successful!</h1>
+    </div>
+    
+    <div class="content">
+      <div class="confirmation-box">
+        <div class="check-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+        <h3>Your Booking is Confirmed!</h3>
+        <p>Thank you for your payment. A confirmation email has been sent to your registered email address.</p>
+      </div>
+
+      <div class="next-steps">
+        <h3>What happens next?</h3>
+        <div class="step">
+          <span class="step-number">1</span>
+          <span class="step-text">You will receive a confirmation email with your booking details and invoice.</span>
+        </div>
+        <div class="step">
+          <span class="step-number">2</span>
+          <span class="step-text">Arrive at the field 15 minutes before your scheduled time.</span>
+        </div>
+        <div class="step">
+          <span class="step-number">3</span>
+          <span class="step-text">Show your booking reference at reception to access the field.</span>
+        </div>
+      </div>
+
+      <div class="buttons">
+        <a href="https://www.edendalesports.co.za/EDENDALESPORTSPROJECTNPC/app/bookings" class="btn btn-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          </svg>
+          View My Bookings
+        </a>
+        <a href="https://www.edendalesports.co.za/EDENDALESPORTSPROJECTNPC/" class="btn btn-outline">
+          Back to Home
+        </a>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>Need help? Contact us at <a href="mailto:bookings@edendalesports.co.za">bookings@edendalesports.co.za</a> or call +27 33 123 4567</p>
+    </div>
+  </div>
+</body>
+</html>
