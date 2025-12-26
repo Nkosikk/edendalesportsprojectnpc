@@ -5,7 +5,7 @@ import type { PaymentStatus } from '../../types';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
-import { CheckCircle, XCircle, Clock } from 'lucide-react';
+import { CheckCircle, XCircle, Clock, CreditCard, Building2, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const PaymentStatusPage: React.FC = () => {
@@ -102,12 +102,86 @@ const PaymentStatusPage: React.FC = () => {
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <Card>
         <CardHeader>
-          <CardTitle className="text-center">Payment Status</CardTitle>
+          <CardTitle className="text-center">
+            {isCancelFlow ? 'Payment Cancelled' : 'Payment Status'}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="flex justify-center py-8"><LoadingSpinner /></div>
-          ) : !status && !isCancelFlow && !isSuccessFlow ? (
+          ) : isCancelFlow ? (
+            /* Cancellation Screen */
+            <div className="space-y-6">
+              <div className="text-center">
+                <div className="flex justify-center mb-4">
+                  <div className="bg-red-100 rounded-full p-4">
+                    <XCircle className="h-12 w-12 text-red-600" />
+                  </div>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  Payment Cancelled
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  You have cancelled the payment for your field booking. Your booking is still reserved but requires payment to be confirmed.
+                </p>
+              </div>
+
+              {/* Payment Options */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-medium text-gray-900 mb-3">What would you like to do?</h4>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                    <CreditCard className="h-5 w-5 text-primary-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-gray-900">Pay Online</p>
+                      <p className="text-sm text-gray-600">Go back to your booking and complete the online payment via PayFast.</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200">
+                    <Building2 className="h-5 w-5 text-primary-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-gray-900">Manual Payment</p>
+                      <p className="text-sm text-gray-600">Pay via EFT bank transfer or cash at reception. Contact us for bank details.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bank Details for Manual Payment */}
+              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                <h4 className="font-medium text-blue-900 mb-2">Bank Details for EFT Payment</h4>
+                <div className="text-sm text-blue-800 space-y-1">
+                  <p><span className="font-medium">Bank:</span> Standard Bank</p>
+                  <p><span className="font-medium">Account Name:</span> Edendale Sports Complex</p>
+                  <p><span className="font-medium">Account Number:</span> 123456789</p>
+                  <p><span className="font-medium">Branch Code:</span> 051001</p>
+                  <p><span className="font-medium">Reference:</span> Your booking reference</p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
+                <Button 
+                  onClick={() => navigate('/app/bookings')} 
+                  className="flex-1"
+                >
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  Go to My Bookings
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={handleBackToDashboard}
+                  className="flex-1"
+                >
+                  Back to Dashboard
+                </Button>
+              </div>
+
+              <p className="text-xs text-gray-500 text-center">
+                Need help? Contact us at bookings@edendalesports.co.za or call +27 33 123 4567
+              </p>
+            </div>
+          ) : !status && !isSuccessFlow ? (
             <div className="text-center py-8">
               <p className="text-gray-500 mb-4">No payment information found.</p>
               <Button onClick={handleBackToDashboard}>Back to Dashboard</Button>
