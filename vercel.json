@@ -35,6 +35,14 @@
     {
       "source": "/admin/(.*)",
       "destination": "/"
+    },
+    {
+      "source": "/payment/(.*)",
+      "destination": "/"
+    },
+    {
+      "source": "/payments/(.*)",
+      "destination": "/"
     }
   ]
 }
