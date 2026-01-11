@@ -17,7 +17,6 @@ import {
   getCancellationRestrictionMessage,
   canUserModifyBooking,
   getModificationRestrictionMessage,
-  getExplicitRefundAmount,
 } from '../../lib/utils';
 import PayButton from '../../components/payments/PayButton';
 import { paymentService } from '../../services/paymentService';
@@ -162,7 +161,6 @@ const BookingDetailsPage = () => {
 
   const showPay = booking.status === 'pending';
   const adjustedAmount = getRefundAdjustedAmount(booking);
-  const refundDue = getExplicitRefundAmount(booking);
   const showCancelAction = booking.status === 'pending' || booking.status === 'confirmed';
   const canCancel = canUserCancelBooking(booking, user?.role);
   const cancelRestriction = getCancellationRestrictionMessage(booking, user?.role);

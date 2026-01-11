@@ -14,7 +14,6 @@ import {
   getRefundAdjustedAmount,
   canUserCancelBooking,
   getCancellationRestrictionMessage,
-  getExplicitRefundAmount,
   shouldAutoCompleteBooking,
 } from '../../lib/utils';
 import PayButton from '../../components/payments/PayButton';
@@ -322,7 +321,6 @@ const BookingsPage = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {(visibleBookings || []).map((booking) => {
               const adjustedAmount = getRefundAdjustedAmount(booking);
-              const refundDue = getExplicitRefundAmount(booking);
               const showCancelAction = booking.status === 'pending' || booking.status === 'confirmed';
               const canCancel = canUserCancelBooking(booking, user?.role);
               const cancelRestriction = getCancellationRestrictionMessage(booking, user?.role);
