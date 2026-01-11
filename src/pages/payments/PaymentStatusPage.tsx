@@ -15,8 +15,17 @@ const PaymentStatusPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const payment_reference = params.get('payment_reference') || params.get('pf_payment_id') || undefined;
-  const booking_id = params.get('booking_id') ? Number(params.get('booking_id')) : undefined;
+  // PayFast can return various parameters - try multiple options
+  const payment_reference = params.get('payment_reference') 
+    || params.get('pf_payment_id') 
+    || params.get('m_payment_id')  // PayFast merchant payment ID
+    || params.get('custom_str1')   // Custom field we might have set
+    || undefined;
+  const booking_id = params.get('booking_id') 
+    ? Number(params.get('booking_id')) 
+    : params.get('custom_int1') 
+      ? Number(params.get('custom_int1'))  // Custom field for booking ID
+      : undefined;
   
   // Detect flow type from URL path
   const isSuccessFlow = location.pathname.includes('/success');

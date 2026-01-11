@@ -52,6 +52,12 @@ function App() {
         <Route path="reset-password" element={<ResetPasswordPage />} />
       </Route>
 
+      {/* Public Payment Routes - PayFast redirects here (no auth required) */}
+      <Route path="/payment/success" element={<PaymentStatusPage />} />
+      <Route path="/payment/cancel" element={<PaymentStatusPage />} />
+      <Route path="/app/payment/success" element={<PaymentStatusPage />} />
+      <Route path="/app/payment/cancel" element={<PaymentStatusPage />} />
+
       {/* Protected Routes */}
       <Route path="/app" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<DashboardPage />} />

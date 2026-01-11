@@ -3,10 +3,10 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react()],
-  // Base path for production deployment on edendalesports.co.za
-  base: '/EDENDALESPORTSPROJECTNPC/',
+  // Base path only for production build (edendalesports.co.za), not for dev
+  base: command === 'build' ? '/EDENDALESPORTSPROJECTNPC/' : '/',
   // Store Vite's cache outside node_modules to avoid EACCES issues
   cacheDir: '.vite',
   resolve: {
@@ -36,4 +36,4 @@ export default defineConfig({
       }
     }
   }
-})
+}))
