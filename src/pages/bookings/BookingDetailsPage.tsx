@@ -15,6 +15,8 @@ import {
   getRefundAdjustedAmount,
   canUserCancelBooking,
   getCancellationRestrictionMessage,
+  canUserModifyBooking,
+  getModificationRestrictionMessage,
   getExplicitRefundAmount,
 } from '../../lib/utils';
 import PayButton from '../../components/payments/PayButton';
@@ -164,6 +166,8 @@ const BookingDetailsPage = () => {
   const showCancelAction = booking.status === 'pending' || booking.status === 'confirmed';
   const canCancel = canUserCancelBooking(booking, user?.role);
   const cancelRestriction = getCancellationRestrictionMessage(booking, user?.role);
+  const canModify = canUserModifyBooking(booking, user?.role);
+  const modifyRestriction = getModificationRestrictionMessage(booking, user?.role);
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
@@ -252,6 +256,13 @@ const BookingDetailsPage = () => {
                 {booking.payment_status === 'manual_pending' ? 'Confirm Manual Payment' : 'Mark as Paid'}
               </Button>
             )}
+            {canModify && (
+              <Link to={`/app/bookings/${booking.id}/edit`}>
+                <Button variant="outline" size="sm">
+                  Modify Booking
+                </Button>
+              </Link>
+            )}
             <Button 
               variant="outline" 
               onClick={() => setShowInvoiceModal(true)}
@@ -276,8 +287,12 @@ const BookingDetailsPage = () => {
               </Button>
             )}
           </div>
+          {/* Restriction messages */}
           {showCancelAction && !canCancel && cancelRestriction && (
             <p className="text-xs text-gray-500 mt-2">{cancelRestriction}</p>
+          )}
+          {!canModify && modifyRestriction && (
+            <p className="text-xs text-gray-500 mt-1">{modifyRestriction}</p>
           )}
         </div>
 
@@ -291,6 +306,14 @@ const BookingDetailsPage = () => {
             <p className="text-sm text-gray-600">
               Are you sure you want to cancel this booking? This action cannot be undone.
             </p>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-sm font-medium text-red-800">
+                ⚠️ No Refund Policy
+              </p>
+              <p className="text-xs text-red-700 mt-1">
+                All payments are final. No refunds will be issued for cancelled bookings.
+              </p>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Reason for cancellation (optional)

@@ -164,6 +164,35 @@ const isPrivilegedRole = (role?: string | UserRole | null) => {
   return normalized === UserRole.Admin || normalized === UserRole.Staff;
 };
 
+// Booking amendments allowed up to 3 hours before start time
+export const canUserModifyBooking = (
+  booking: BookingDetails | null | undefined,
+  role?: string | UserRole | null
+): boolean => {
+  if (!booking) return false;
+  if (booking.status !== 'pending' && booking.status !== 'confirmed') return false;
+  if (isPrivilegedRole(role)) return true;
+  const hoursUntil = hoursUntilBookingStart(booking);
+  if (hoursUntil === null) return true;
+  return hoursUntil >= 3; // 3 hours before booking
+};
+
+export const getModificationRestrictionMessage = (
+  booking: BookingDetails | null | undefined,
+  role?: string | UserRole | null
+): string | null => {
+  if (!booking) return null;
+  if (booking.status === 'cancelled') return 'Cancelled bookings cannot be modified.';
+  if (booking.status === 'completed') return 'Completed bookings cannot be modified.';
+  if (isPrivilegedRole(role)) return null;
+  const hoursUntil = hoursUntilBookingStart(booking);
+  if (hoursUntil !== null && hoursUntil < 3) {
+    return 'Booking amendments are only allowed up to 3 hours before start time.';
+  }
+  return null;
+};
+
+// Cancellations allowed up to 3 hours before start time (no refunds)
 export const canUserCancelBooking = (
   booking: BookingDetails | null | undefined,
   role?: string | UserRole | null
@@ -173,7 +202,7 @@ export const canUserCancelBooking = (
   if (isPrivilegedRole(role)) return true;
   const hoursUntil = hoursUntilBookingStart(booking);
   if (hoursUntil === null) return true;
-  return hoursUntil >= 24;
+  return hoursUntil >= 3; // 3 hours before booking
 };
 
 export const getCancellationRestrictionMessage = (
@@ -185,8 +214,8 @@ export const getCancellationRestrictionMessage = (
   if (booking.status === 'completed') return 'Completed bookings cannot be cancelled.';
   if (isPrivilegedRole(role)) return null;
   const hoursUntil = hoursUntilBookingStart(booking);
-  if (hoursUntil !== null && hoursUntil < 24) {
-    return 'Cancellations are only allowed up to 24 hours before start time.';
+  if (hoursUntil !== null && hoursUntil < 3) {
+    return 'Cancellations are only allowed up to 3 hours before start time. No refunds available.';
   }
   return null;
 };

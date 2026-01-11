@@ -9,7 +9,7 @@ import { BookingDetails } from '../../types';
 import { useState, useEffect } from 'react';
 import { ArrowLeft, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { safeNumber } from '../../lib/utils';
+import { safeNumber, canUserModifyBooking, getModificationRestrictionMessage } from '../../lib/utils';
 import { normalizeTimeHM } from '../../utils/scheduling';
 
 const parseDateFromISO = (isoDate: string): Date => {
@@ -197,8 +197,9 @@ const ModifyBookingPage = () => {
     );
   }
 
-  // Check if user can edit this booking
-  const canEdit = booking.status === 'pending' || booking.status === 'confirmed';
+  // Check if user can edit this booking (3 hours before start time)
+  const canEdit = canUserModifyBooking(booking, user?.role);
+  const modificationRestriction = getModificationRestrictionMessage(booking, user?.role);
   const isOwner = user?.role === 'admin' || booking.user_id === user?.id;
 
   if (!isOwner) {
@@ -226,13 +227,15 @@ const ModifyBookingPage = () => {
     }
   })();
 
-  if (!canEdit && booking.status !== 'cancelled') {
+  if (!canEdit) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <AlertTriangle className="mx-auto h-12 w-12 text-amber-500 mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Cannot Edit Booking</h2>
-          <p className="text-gray-600 mb-4">This booking cannot be edited because it has been {booking.status}.</p>
+          <p className="text-gray-600 mb-4">
+            {modificationRestriction || 'This booking cannot be edited.'}
+          </p>
           <Link to="/app/bookings">
             <Button variant="outline" icon={ArrowLeft}>Back to Bookings</Button>
           </Link>
