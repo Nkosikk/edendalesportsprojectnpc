@@ -12,6 +12,7 @@ const PaymentStatusPage: React.FC = () => {
   const [params] = useSearchParams();
   const [status, setStatus] = useState<PaymentStatus | null>(null);
   const [loading, setLoading] = useState(true);
+  const [polling, setPolling] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -31,36 +32,77 @@ const PaymentStatusPage: React.FC = () => {
   const isSuccessFlow = location.pathname.includes('/success');
   const isCancelFlow = location.pathname.includes('/cancel');
 
+  // Poll for payment status update (PayFast ITN may take a few seconds)
   useEffect(() => {
-    const load = async () => {
+    let pollCount = 0;
+    const maxPolls = 10; // Poll up to 10 times (30 seconds total)
+    let pollInterval: NodeJS.Timeout | null = null;
+
+    const fetchStatus = async () => {
       try {
-        setLoading(true);
-        
-        // If we have payment reference or booking ID, try to fetch status
         if (payment_reference || booking_id) {
           const data = await paymentService.getPaymentStatus(payment_reference, booking_id);
           setStatus(data);
           
-          // Show appropriate toast based on payment status
+          // If payment is completed or failed, stop polling
           if (data?.payment?.status === 'completed') {
             toast.success('Payment successful! Your booking is confirmed.');
-          } else if (data?.payment?.status === 'failed' || isCancelFlow) {
-            toast.error('Payment was cancelled or failed.');
+            if (pollInterval) clearInterval(pollInterval);
+            setPolling(false);
+            return true;
+          } else if (data?.payment?.status === 'failed') {
+            toast.error('Payment failed.');
+            if (pollInterval) clearInterval(pollInterval);
+            setPolling(false);
+            return true;
           }
-        } else if (isSuccessFlow) {
-          // PayFast returned to success URL but didn't pass reference
-          // Show success message anyway - ITN will update the actual status
-          toast.success('Payment completed! Your booking will be confirmed shortly.');
-        } else if (isCancelFlow) {
-          toast.error('Payment was cancelled.');
         }
-      } finally {
-        setLoading(false);
+        return false;
+      } catch (error) {
+        console.error('Error fetching payment status:', error);
+        return false;
       }
     };
-    
+
+    const load = async () => {
+      setLoading(true);
+      
+      // Initial fetch
+      const completed = await fetchStatus();
+      setLoading(false);
+      
+      // If success flow and payment not yet completed, start polling
+      if (isSuccessFlow && !completed && (payment_reference || booking_id)) {
+        setPolling(true);
+        toast.success('Payment received! Confirming your booking...');
+        
+        pollInterval = setInterval(async () => {
+          pollCount++;
+          const done = await fetchStatus();
+          
+          if (done || pollCount >= maxPolls) {
+            if (pollInterval) clearInterval(pollInterval);
+            setPolling(false);
+            
+            if (!done && pollCount >= maxPolls) {
+              toast.success('Payment processed! Your booking will be confirmed shortly.');
+            }
+          }
+        }, 3000); // Poll every 3 seconds
+      } else if (isSuccessFlow && !payment_reference && !booking_id) {
+        // No reference passed - show generic success
+        toast.success('Payment completed! Your booking will be confirmed shortly.');
+      } else if (isCancelFlow) {
+        toast.error('Payment was cancelled.');
+      }
+    };
+
     load();
-  }, [payment_reference, booking_id, isCancelFlow, isSuccessFlow]);
+
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [payment_reference, booking_id, isSuccessFlow, isCancelFlow]);
 
   const handleBackToDashboard = () => {
     navigate('/app');
@@ -108,86 +150,91 @@ const PaymentStatusPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-center">
+    <div className="min-h-screen flex items-center justify-center px-4 py-4 sm:py-8">
+      <Card className="w-full max-w-lg">
+        <CardHeader className="pb-2 sm:pb-4">
+          <CardTitle className="text-center text-lg sm:text-xl">
             {isCancelFlow ? 'Payment Cancelled' : 'Payment Status'}
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6">
           {loading ? (
-            <div className="flex justify-center py-8"><LoadingSpinner /></div>
+            <div className="flex justify-center py-6"><LoadingSpinner /></div>
           ) : isCancelFlow ? (
-            /* Cancellation Screen */
-            <div className="space-y-6">
+            /* Cancellation Screen - Optimized for single screen view */
+            <div className="space-y-4">
               <div className="text-center">
-                <div className="flex justify-center mb-4">
-                  <div className="bg-red-100 rounded-full p-4">
-                    <XCircle className="h-12 w-12 text-red-600" />
+                <div className="flex justify-center mb-3">
+                  <div className="bg-red-100 rounded-full p-3">
+                    <XCircle className="h-8 w-8 sm:h-10 sm:w-10 text-red-600" />
                   </div>
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-1">
                   Payment Cancelled
                 </h3>
-                <p className="text-gray-600 mb-4">
-                  You have cancelled the payment for your field booking. Your booking is still reserved but requires payment to be confirmed.
+                <p className="text-sm text-gray-600">
+                  Your booking is reserved but requires payment to be confirmed.
                 </p>
               </div>
 
-              {/* Payment Options */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-medium text-gray-900 mb-3">What would you like to do?</h4>
-                <div className="space-y-3">
-                  <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200">
-                    <CreditCard className="h-5 w-5 text-primary-600 mt-0.5 flex-shrink-0" />
+              {/* Payment Options - Compact */}
+              <div className="bg-gray-50 rounded-lg p-3">
+                <h4 className="font-medium text-gray-900 mb-2 text-sm">What would you like to do?</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-gray-200">
+                    <CreditCard className="h-4 w-4 text-primary-600 flex-shrink-0" />
                     <div>
-                      <p className="font-medium text-gray-900">Pay Online</p>
-                      <p className="text-sm text-gray-600">Go back to your booking and complete the online payment via PayFast.</p>
+                      <p className="font-medium text-gray-900 text-sm">Pay Online</p>
+                      <p className="text-xs text-gray-600">Complete payment via PayFast</p>
                     </div>
                   </div>
-                  <div className="flex items-start gap-3 p-3 bg-white rounded-lg border border-gray-200">
-                    <Building2 className="h-5 w-5 text-primary-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-gray-200">
+                    <Building2 className="h-4 w-4 text-primary-600 flex-shrink-0" />
                     <div>
-                      <p className="font-medium text-gray-900">Manual Payment</p>
-                      <p className="text-sm text-gray-600">Pay via EFT bank transfer or cash at reception. Contact us for bank details.</p>
+                      <p className="font-medium text-gray-900 text-sm">Manual Payment</p>
+                      <p className="text-xs text-gray-600">EFT or cash at reception</p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Bank Details for Manual Payment */}
-              <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                <h4 className="font-medium text-blue-900 mb-2">Bank Details for EFT Payment</h4>
-                <div className="text-sm text-blue-800 space-y-1">
-                  <p><span className="font-medium">Bank:</span> Standard Bank</p>
-                  <p><span className="font-medium">Account Name:</span> Edendale Sports Complex</p>
-                  <p><span className="font-medium">Account Number:</span> 123456789</p>
-                  <p><span className="font-medium">Branch Code:</span> 051001</p>
+              {/* Bank Details - Compact */}
+              <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                <h4 className="font-medium text-blue-900 mb-2 text-sm">Banking Details</h4>
+                <div className="text-xs sm:text-sm text-blue-800 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                  <p><span className="font-medium">Bank:</span> First National Bank (FNB)</p>
+                  <p><span className="font-medium">Account Type:</span> Gold Business Account</p>
+                  <p><span className="font-medium">Account Name:</span> Edendale Sports Projects NPC</p>
+                  <p><span className="font-medium">Account Number:</span> 63134355858</p>
+                  <p><span className="font-medium">Branch Code:</span> 221325</p>
+                  <p><span className="font-medium">Branch Name:</span> Boom Street 674</p>
+                  <p><span className="font-medium">Swift Code:</span> FIRNZAJJ</p>
                   <p><span className="font-medium">Reference:</span> Your booking reference</p>
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t">
+              {/* Action Buttons - Compact */}
+              <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t">
                 <Button 
                   onClick={() => navigate('/app/bookings')} 
-                  className="flex-1"
+                  className="flex-1 text-sm py-2"
+                  size="sm"
                 >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  <ArrowLeft className="h-4 w-4 mr-1" />
                   Go to My Bookings
                 </Button>
                 <Button 
                   variant="outline" 
                   onClick={handleBackToDashboard}
-                  className="flex-1"
+                  className="flex-1 text-sm py-2"
+                  size="sm"
                 >
                   Back to Dashboard
                 </Button>
               </div>
 
               <p className="text-xs text-gray-500 text-center">
-                Need help? Contact us at bookings@edendalesports.co.za or call +27 33 123 4567
+                Need help? bookings@edendalesports.co.za | +27 33 123 4567
               </p>
             </div>
           ) : !status && !isSuccessFlow ? (
@@ -200,12 +247,23 @@ const PaymentStatusPage: React.FC = () => {
               {/* Status Icon and Message */}
               <div className="text-center">
                 <div className="flex justify-center mb-4">
-                  {getStatusIcon(status?.payment?.status)}
+                  {polling ? (
+                    <div className="animate-pulse">
+                      <Clock className="h-8 w-8 text-yellow-600" />
+                    </div>
+                  ) : (
+                    getStatusIcon(status?.payment?.status)
+                  )}
                 </div>
                 <h3 className="text-lg font-semibold mb-2">
-                  {getStatusMessage(status?.payment?.status)}
+                  {polling ? 'Confirming your payment...' : getStatusMessage(status?.payment?.status)}
                 </h3>
-                {isSuccessFlow && !status && (
+                {polling && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    Please wait while we confirm your payment with PayFast.
+                  </p>
+                )}
+                {isSuccessFlow && !status && !polling && (
                   <p className="text-sm text-gray-500 mt-2">
                     Your payment has been received. The booking confirmation will be processed automatically.
                   </p>
