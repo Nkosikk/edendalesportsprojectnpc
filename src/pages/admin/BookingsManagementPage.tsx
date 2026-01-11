@@ -625,35 +625,7 @@ const BookingsManagementPage: React.FC = () => {
                 </>
               )}
 
-              {/* Mark Refunded (when cancelled and not yet refunded) */}
-              {booking.status === 'cancelled' && booking.payment_status !== 'refunded' &&
-                booking.payment_status !== 'pending' &&
-                booking.payment_status !== 'manual_pending' && (
-                <>
-                  <div className="border-t my-1"></div>
-                  <button
-                    onClick={() => {
-                      // In historical version this opened a refund modal; here we directly invoke service
-                      (async () => {
-                        try {
-                          const amount = typeof booking.refund_amount === 'number' ? booking.refund_amount : undefined;
-                          await adminService.markBookingRefunded({ booking_id: booking.id, amount });
-                          toast.success('Refund marked as processed');
-                          await load();
-                        } catch (e: any) {
-                          toast.error(e?.response?.data?.message || e?.message || 'Failed to mark refund');
-                        } finally {
-                          setOpenDropdown(null);
-                        }
-                      })();
-                    }}
-                    className="w-full px-4 py-1 text-left text-sm hover:bg-gray-50 flex items-center gap-2 text-purple-600"
-                  >
-                    <DollarSign className="h-4 w-4" />
-                    Mark Refunded
-                  </button>
-                </>
-              )}
+
             </div>
           </div>
         )}
@@ -697,7 +669,6 @@ const BookingsManagementPage: React.FC = () => {
           <div>
             <div className="text-[10px] uppercase tracking-wide text-gray-500">Amount</div>
             <div className="font-semibold text-gray-900">{amountLabel}</div>
-            {adjustedAmount < 0 && <div className="text-[10px] text-red-600">Refund</div>}
           </div>
         </div>
 
@@ -982,7 +953,6 @@ const BookingsManagementPage: React.FC = () => {
                 <option value="manual_pending">Manual</option>
                 <option value="paid">Paid</option>
                 <option value="failed">Failed</option>
-                <option value="refunded">Refunded</option>
               </select>
             </div>
             <div>
@@ -1126,11 +1096,6 @@ const BookingsManagementPage: React.FC = () => {
                     return (
                       <div className="text-xs font-medium">
                         <div>{formatCurrency(Math.abs(displayAmount))}</div>
-                        {displayAmount < 0 && (
-                          <span className="block text-xs text-red-600 leading-tight">
-                            Refund
-                          </span>
-                        )}
                       </div>
                     );
                   } 
