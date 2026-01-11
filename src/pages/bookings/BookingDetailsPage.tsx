@@ -230,15 +230,6 @@ const BookingDetailsPage = () => {
             <div>
               <div className="text-sm text-gray-500">Total Amount</div>
               <div className="text-2xl font-semibold text-gray-900">{formatCurrency(Math.abs(adjustedAmount))}</div>
-                {booking.payment_status === 'refunded' ? (
-                  <p className="text-sm font-semibold text-purple-600">
-                    Refund processed {refundDue ? `(${formatCurrency(refundDue)})` : ''}
-                  </p>
-                ) : adjustedAmount < 0 ? (
-                  <p className="text-sm font-semibold text-red-600">
-                    Refund owed {refundDue ? `(${formatCurrency(refundDue)})` : ''}
-                  </p>
-                ) : null}
             </div>
           </div>
 

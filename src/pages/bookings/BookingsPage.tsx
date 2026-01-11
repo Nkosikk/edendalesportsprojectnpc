@@ -381,11 +381,7 @@ const BookingsPage = () => {
                       {formatCurrency(Math.abs(adjustedAmount))}
                     </span>
                   </div>
-                  {booking.payment_status === 'refunded' ? (
-                    <p className="text-xs font-semibold text-purple-600">Refund processed{refundDue ? ` (${formatCurrency(refundDue)})` : ''}</p>
-                  ) : adjustedAmount < 0 ? (
-                    <p className="text-xs font-semibold text-red-600">Refund owed to you{refundDue ? `: ${formatCurrency(refundDue)}` : ''}</p>
-                  ) : null}
+
                   <div className="flex flex-wrap gap-2">
                     <Link to={`/app/bookings/${booking.id}`} className="flex-1 min-w-[100px]">
                       <Button variant="outline" size="sm" className="w-full">
