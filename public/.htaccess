@@ -1,6 +1,6 @@
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteBase /EDENDALESPORTSPROJECTNPC/
+  RewriteBase /
   
   # Redirect HTTP to HTTPS
   RewriteCond %{HTTPS} off
