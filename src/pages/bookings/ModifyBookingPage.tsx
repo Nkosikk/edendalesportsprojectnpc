@@ -1,8 +1,6 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { bookingService } from '../../services/bookingService';
-import { paymentService } from '../../services/paymentService';
-import { adminService } from '../../services/adminService';
 import BookingCalendar from '../../components/bookings/BookingCalendar';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
@@ -147,32 +145,7 @@ const ModifyBookingPage = () => {
 
       const newBooking = await bookingService.createBooking(createRequest);
 
-      // Backend handles payment transfer and original booking cancellation automatically
-      // No need for frontend to manage these operations
-
-      // Handle payment status for the new booking (same duration = transfer payment)
-      if (wasOriginalPaid && newBooking?.id) {
-        try {
-          // Duration is locked, so it's always the same - mark as paid and confirm
-          try {
-            await adminService.markBookingAsPaid(newBooking.id);
-          } catch (markPaidErr: any) {
-            console.warn('markBookingAsPaid failed, trying confirmPayment:', markPaidErr);
-            await paymentService.confirmPayment(undefined, newBooking.id);
-          }
-          
-          try {
-            await adminService.updateBookingStatus({ 
-              booking_id: newBooking.id, 
-              status: 'confirmed' 
-            });
-          } catch (statusErr: any) {
-            console.warn('updateBookingStatus failed:', statusErr);
-          }
-        } catch (paymentError: any) {
-          console.warn('Failed to update payment status for new booking:', paymentError);
-        }
-      }
+      // Backend handles payment transfer, status update, and original booking cancellation automatically
 
       return newBooking;
     },
