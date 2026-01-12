@@ -147,18 +147,8 @@ const ModifyBookingPage = () => {
 
       const newBooking = await bookingService.createBooking(createRequest);
 
-      let cancelFailed = false;
-      let cancelErrorMessage: string | undefined;
-      if (booking.status !== 'cancelled') {
-        try {
-          const reason = `Rescheduled via edit${newBooking?.booking_reference ? ` (#${newBooking.booking_reference})` : ''}`;
-          await bookingService.cancelBooking(bookingId, reason);
-        } catch (error: any) {
-          console.error('Failed to cancel original booking after reschedule', error);
-          cancelFailed = true;
-          cancelErrorMessage = error?.response?.data?.message || error?.message;
-        }
-      }
+      // Backend handles payment transfer and original booking cancellation automatically
+      // No need for frontend to manage these operations
 
       // Handle payment status for the new booking (same duration = transfer payment)
       if (wasOriginalPaid && newBooking?.id) {
@@ -184,28 +174,13 @@ const ModifyBookingPage = () => {
         }
       }
 
-      return { 
-        newBooking, 
-        cancelFailed, 
-        cancelErrorMessage
-      };
+      return newBooking;
     },
     {
-      onSuccess: ({ newBooking, cancelFailed, cancelErrorMessage }) => {
-        if (cancelFailed) {
-          toast.success('New booking created, but please cancel the original booking manually.');
-          if (cancelErrorMessage) {
-            toast.error(cancelErrorMessage);
-          }
-        } else {
-          toast.success('Booking updated successfully.');
-        }
-        
+      onSuccess: () => {
+        toast.success('Booking updated successfully.');
         qc.invalidateQueries(['bookings']);
         qc.invalidateQueries(['booking', bookingId]);
-        if (newBooking?.id) {
-          qc.invalidateQueries(['booking', newBooking.id]);
-        }
         navigate('/app/bookings');
       },
       onError: (e: any) => {
