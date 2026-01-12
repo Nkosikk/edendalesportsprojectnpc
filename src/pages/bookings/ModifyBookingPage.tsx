@@ -195,9 +195,26 @@ const ModifyBookingPage = () => {
               paymentMessage = `Payment confirmed. Credit of R${refundAmount.toFixed(2)} is due to you.`;
             }
           } else {
-            // Longer duration: Still pending, but partial payment applied
+            // Longer duration: Apply partial payment credit
+            // We mark as paid for the original amount, but the booking still needs the remaining balance
             const pendingAmount = newAmount - amountPaid;
-            paymentMessage = `Partial payment of R${amountPaid.toFixed(2)} applied. Remaining balance: R${pendingAmount.toFixed(2)}.`;
+            
+            // Update the booking notes to reflect the payment credit
+            try {
+              const creditNote = `[Payment Credit: R${amountPaid.toFixed(2)} from booking #${booking.booking_reference}. Remaining balance: R${pendingAmount.toFixed(2)}]`;
+              const updatedNotes = createRequest.notes 
+                ? `${createRequest.notes}\n${creditNote}` 
+                : creditNote;
+              
+              // Update the booking with the credit note
+              await bookingService.updateBooking(newBooking.id, {
+                notes: updatedNotes
+              });
+            } catch (noteErr: any) {
+              console.warn('Failed to update booking notes with credit info:', noteErr);
+            }
+            
+            paymentMessage = `Partial payment of R${amountPaid.toFixed(2)} credited. Remaining balance: R${pendingAmount.toFixed(2)} pending.`;
           }
         } catch (paymentError: any) {
           console.warn('Failed to update payment status for new booking:', paymentError);
