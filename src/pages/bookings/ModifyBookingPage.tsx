@@ -121,7 +121,7 @@ const ModifyBookingPage = () => {
       // Determine if original booking was paid
       const wasOriginalPaid = booking.payment_status === 'paid';
       
-      // Build the create booking request with payment carryover info
+      // Build the create booking request with original booking info
       const createRequest: any = {
         field_id: booking.field_id,
         booking_date: toLocalDateInputValue(date),
@@ -129,15 +129,16 @@ const ModifyBookingPage = () => {
         end_time: normalizedEnd,
         duration_hours: newDuration,
         notes: notes || undefined,
+        // Always send original booking info so backend can cancel it
+        original_booking_id: booking.id,
+        original_booking_reference: booking.booking_reference,
+        original_payment_status: booking.payment_status,
+        original_duration_hours: originalDuration,
       };
       
       // Add payment carryover fields if original was paid
       if (wasOriginalPaid) {
-        createRequest.original_booking_id = booking.id;
-        createRequest.original_booking_reference = booking.booking_reference;
         createRequest.original_total_amount = originalAmount;
-        createRequest.original_payment_status = booking.payment_status;
-        createRequest.original_duration_hours = originalDuration;
         createRequest.carry_over_payment = true;
         createRequest.amount_paid = amountPaid;
         createRequest.payment_adjustment = paymentAdjustment;
