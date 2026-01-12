@@ -160,95 +160,45 @@ const ModifyBookingPage = () => {
         }
       }
 
-      // Handle payment status for the new booking based on duration change
-      let paymentConfirmed = false;
-      let paymentMessage = '';
-      
+      // Handle payment status for the new booking (same duration = transfer payment)
       if (wasOriginalPaid && newBooking?.id) {
         try {
-          if (newDuration === originalDuration || newDuration < originalDuration) {
-            // Same or shorter duration: Mark as paid and confirm
-            // First try to mark as paid (creates payment record)
-            try {
-              await adminService.markBookingAsPaid(newBooking.id);
-            } catch (markPaidErr: any) {
-              console.warn('markBookingAsPaid failed, trying confirmPayment:', markPaidErr);
-              // Fallback to confirmPayment if markBookingAsPaid fails
-              await paymentService.confirmPayment(undefined, newBooking.id);
-            }
-            
-            // Then update status to confirmed
-            try {
-              await adminService.updateBookingStatus({ 
-                booking_id: newBooking.id, 
-                status: 'confirmed' 
-              });
-            } catch (statusErr: any) {
-              console.warn('updateBookingStatus failed:', statusErr);
-            }
-            
-            paymentConfirmed = true;
-            if (newDuration === originalDuration) {
-              paymentMessage = 'Payment transferred from original booking.';
-            } else {
-              const refundAmount = amountPaid - newAmount;
-              paymentMessage = `Payment confirmed. Credit of R${refundAmount.toFixed(2)} is due to you.`;
-            }
-          } else {
-            // Longer duration: Apply partial payment credit
-            // We mark as paid for the original amount, but the booking still needs the remaining balance
-            const pendingAmount = newAmount - amountPaid;
-            
-            // Update the booking notes to reflect the payment credit
-            try {
-              const creditNote = `[Payment Credit: R${amountPaid.toFixed(2)} from booking #${booking.booking_reference}. Remaining balance: R${pendingAmount.toFixed(2)}]`;
-              const updatedNotes = createRequest.notes 
-                ? `${createRequest.notes}\n${creditNote}` 
-                : creditNote;
-              
-              // Update the booking with the credit note
-              await bookingService.updateBooking(newBooking.id, {
-                notes: updatedNotes
-              });
-            } catch (noteErr: any) {
-              console.warn('Failed to update booking notes with credit info:', noteErr);
-            }
-            
-            paymentMessage = `Partial payment of R${amountPaid.toFixed(2)} credited. Remaining balance: R${pendingAmount.toFixed(2)} pending.`;
+          // Duration is locked, so it's always the same - mark as paid and confirm
+          try {
+            await adminService.markBookingAsPaid(newBooking.id);
+          } catch (markPaidErr: any) {
+            console.warn('markBookingAsPaid failed, trying confirmPayment:', markPaidErr);
+            await paymentService.confirmPayment(undefined, newBooking.id);
+          }
+          
+          try {
+            await adminService.updateBookingStatus({ 
+              booking_id: newBooking.id, 
+              status: 'confirmed' 
+            });
+          } catch (statusErr: any) {
+            console.warn('updateBookingStatus failed:', statusErr);
           }
         } catch (paymentError: any) {
           console.warn('Failed to update payment status for new booking:', paymentError);
-          paymentMessage = 'Note: Please verify payment status manually.';
         }
       }
 
       return { 
         newBooking, 
         cancelFailed, 
-        cancelErrorMessage, 
-        paymentConfirmed, 
-        paymentMessage,
-        wasOriginalPaid
+        cancelErrorMessage
       };
     },
     {
-      onSuccess: ({ newBooking, cancelFailed, cancelErrorMessage, paymentConfirmed, paymentMessage, wasOriginalPaid }) => {
+      onSuccess: ({ newBooking, cancelFailed, cancelErrorMessage }) => {
         if (cancelFailed) {
           toast.success('New booking created, but please cancel the original booking manually.');
           if (cancelErrorMessage) {
             toast.error(cancelErrorMessage);
           }
         } else {
-          toast.success('New booking created and original booking archived as cancelled.');
-        }
-        
-        // Show payment status message
-        if (wasOriginalPaid && paymentMessage) {
-          if (paymentConfirmed) {
-            toast.success(paymentMessage);
-          } else {
-            toast(paymentMessage, { duration: 5000, icon: 'ℹ️' });
-          }
+          toast.success('Booking updated successfully.');
         }
         
         qc.invalidateQueries(['bookings']);
@@ -413,9 +363,13 @@ const ModifyBookingPage = () => {
           </div>
           <div className="flex flex-col">
             <label className="text-xs font-medium text-gray-700 mb-1">Duration</label>
-            <select value={duration} onChange={e => setDuration(Number(e.target.value))} className="input text-sm">
-              {[1,2,3,4].map(h => <option key={h} value={h}>{h}h</option>)}
-            </select>
+            <div className="input text-sm bg-gray-100 cursor-not-allowed flex items-center">
+              {duration}h
+              <span className="ml-2 text-xs text-gray-500">(locked)</span>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Need a different duration? <Link to="/app/bookings/new" className="text-primary-600 underline">Book a new slot</Link>
+            </p>
           </div>
           <div className="flex items-end">
             <Button
@@ -423,12 +377,11 @@ const ModifyBookingPage = () => {
               size="sm"
               onClick={() => {
                 setDate(startOfToday());
-                setDuration(1);
                 setStart(null);
                 setEnd(null);
               }}
             >
-              Reset
+              Reset Date
             </Button>
           </div>
         </div>
@@ -494,35 +447,10 @@ const ModifyBookingPage = () => {
           {/* Payment Carryover Information */}
           {booking.payment_status === 'paid' && startTime && (
             <div className="mt-4 p-3 rounded-lg border-2 border-dashed bg-gray-50">
-              <h3 className="text-sm font-medium text-gray-700 mb-2">💳 Payment Adjustment</h3>
-              {(() => {
-                const originalDuration = Math.round(safeNumber(booking.duration_hours) || 1);
-                const newDuration = Math.round(duration);
-                const originalAmount = safeNumber(booking.total_amount);
-                const newAmount = safeNumber(cost);
-                
-                if (newDuration === originalDuration) {
-                  return (
-                    <div className="text-sm text-green-700 bg-green-50 p-2 rounded">
-                      <span className="font-medium">✓ Same duration:</span> Your payment of R{originalAmount.toFixed(2)} will be transferred to the new booking. Status will be <span className="font-semibold">PAID & CONFIRMED</span>.
-                    </div>
-                  );
-                } else if (newDuration < originalDuration) {
-                  const credit = originalAmount - newAmount;
-                  return (
-                    <div className="text-sm text-blue-700 bg-blue-50 p-2 rounded">
-                      <span className="font-medium">↓ Shorter duration:</span> Credit of <span className="font-semibold">R{credit.toFixed(2)}</span> will be due to you. New booking will be <span className="font-semibold">PAID & CONFIRMED</span>.
-                    </div>
-                  );
-                } else {
-                  const pending = newAmount - originalAmount;
-                  return (
-                    <div className="text-sm text-amber-700 bg-amber-50 p-2 rounded">
-                      <span className="font-medium">↑ Longer duration:</span> Your payment of R{originalAmount.toFixed(2)} will be applied. Additional <span className="font-semibold">R{pending.toFixed(2)}</span> pending payment required.
-                    </div>
-                  );
-                }
-              })()}
+              <h3 className="text-sm font-medium text-gray-700 mb-2">💳 Payment Transfer</h3>
+              <div className="text-sm text-green-700 bg-green-50 p-2 rounded">
+                <span className="font-medium">✓ Your payment of R{safeNumber(booking.total_amount).toFixed(2)} will be transferred to the new booking.</span> Status will be <span className="font-semibold">PAID & CONFIRMED</span>.
+              </div>
             </div>
           )}
           
