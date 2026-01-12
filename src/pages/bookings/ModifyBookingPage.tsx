@@ -166,25 +166,34 @@ const ModifyBookingPage = () => {
       
       if (wasOriginalPaid && newBooking?.id) {
         try {
-          if (newDuration === originalDuration) {
-            // Same duration: Confirm payment and set status to confirmed
-            await paymentService.confirmPayment(undefined, newBooking.id);
-            await adminService.updateBookingStatus({ 
-              booking_id: newBooking.id, 
-              status: 'confirmed' 
-            });
+          if (newDuration === originalDuration || newDuration < originalDuration) {
+            // Same or shorter duration: Mark as paid and confirm
+            // First try to mark as paid (creates payment record)
+            try {
+              await adminService.markBookingAsPaid(newBooking.id);
+            } catch (markPaidErr: any) {
+              console.warn('markBookingAsPaid failed, trying confirmPayment:', markPaidErr);
+              // Fallback to confirmPayment if markBookingAsPaid fails
+              await paymentService.confirmPayment(undefined, newBooking.id);
+            }
+            
+            // Then update status to confirmed
+            try {
+              await adminService.updateBookingStatus({ 
+                booking_id: newBooking.id, 
+                status: 'confirmed' 
+              });
+            } catch (statusErr: any) {
+              console.warn('updateBookingStatus failed:', statusErr);
+            }
+            
             paymentConfirmed = true;
-            paymentMessage = 'Payment transferred from original booking.';
-          } else if (newDuration < originalDuration) {
-            // Shorter duration: Confirm payment (credit/refund will be due)
-            await paymentService.confirmPayment(undefined, newBooking.id);
-            await adminService.updateBookingStatus({ 
-              booking_id: newBooking.id, 
-              status: 'confirmed' 
-            });
-            paymentConfirmed = true;
-            const refundAmount = amountPaid - newAmount;
-            paymentMessage = `Payment confirmed. Credit of R${refundAmount.toFixed(2)} is due to you.`;
+            if (newDuration === originalDuration) {
+              paymentMessage = 'Payment transferred from original booking.';
+            } else {
+              const refundAmount = amountPaid - newAmount;
+              paymentMessage = `Payment confirmed. Credit of R${refundAmount.toFixed(2)} is due to you.`;
+            }
           } else {
             // Longer duration: Still pending, but partial payment applied
             const pendingAmount = newAmount - amountPaid;
