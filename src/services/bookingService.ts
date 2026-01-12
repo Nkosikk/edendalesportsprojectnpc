@@ -221,6 +221,55 @@ const buildBookingPayload = (data: BookingPayloadSource, { includeFieldId }: { i
     payload.originalEndTime = normalizedOriginalEnd;
   }
 
+  // Payment carryover fields for booking modifications
+  const originalBookingId = (data as any).original_booking_id ?? (data as any).originalBookingId;
+  if (originalBookingId !== undefined) {
+    payload.original_booking_id = Number(originalBookingId);
+    payload.originalBookingId = Number(originalBookingId);
+  }
+
+  const originalBookingRef = (data as any).original_booking_reference ?? (data as any).originalBookingReference;
+  if (originalBookingRef) {
+    payload.original_booking_reference = originalBookingRef;
+    payload.originalBookingReference = originalBookingRef;
+  }
+
+  const originalTotalAmount = (data as any).original_total_amount ?? (data as any).originalTotalAmount;
+  if (originalTotalAmount !== undefined) {
+    payload.original_total_amount = Number(originalTotalAmount);
+    payload.originalTotalAmount = Number(originalTotalAmount);
+  }
+
+  const originalPaymentStatus = (data as any).original_payment_status ?? (data as any).originalPaymentStatus;
+  if (originalPaymentStatus) {
+    payload.original_payment_status = originalPaymentStatus;
+    payload.originalPaymentStatus = originalPaymentStatus;
+  }
+
+  const originalDurationHours = (data as any).original_duration_hours ?? (data as any).originalDurationHours;
+  if (originalDurationHours !== undefined) {
+    payload.original_duration_hours = Number(originalDurationHours);
+    payload.originalDurationHours = Number(originalDurationHours);
+  }
+
+  const carryOverPayment = (data as any).carry_over_payment ?? (data as any).carryOverPayment;
+  if (carryOverPayment !== undefined) {
+    payload.carry_over_payment = Boolean(carryOverPayment);
+    payload.carryOverPayment = Boolean(carryOverPayment);
+  }
+
+  const amountPaid = (data as any).amount_paid ?? (data as any).amountPaid;
+  if (amountPaid !== undefined) {
+    payload.amount_paid = Number(amountPaid);
+    payload.amountPaid = Number(amountPaid);
+  }
+
+  const paymentAdjustment = (data as any).payment_adjustment ?? (data as any).paymentAdjustment;
+  if (paymentAdjustment !== undefined) {
+    payload.payment_adjustment = Number(paymentAdjustment);
+    payload.paymentAdjustment = Number(paymentAdjustment);
+  }
+
   if (includeFieldId) {
     if (!payload.booking_date) throw new Error('Booking date is required for booking creation');
     if (!normalizedStart || !normalizedEnd) throw new Error('Start and end times are required for booking creation');

@@ -322,6 +322,15 @@ export interface CreateBookingRequest {
   notes?: string;
   duration_hours?: number;
   durationHours?: number;
+  // Payment carryover fields for booking modifications
+  original_booking_id?: number;
+  original_booking_reference?: string;
+  original_total_amount?: number;
+  original_payment_status?: 'pending' | 'paid' | 'refunded' | 'failed' | 'manual_pending';
+  original_duration_hours?: number;
+  carry_over_payment?: boolean;
+  amount_paid?: number;
+  payment_adjustment?: number; // Positive = user owes more, Negative = refund due
 }
 
 export interface UpdateBookingRequest {

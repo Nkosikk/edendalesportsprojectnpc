@@ -1,6 +1,8 @@
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { bookingService } from '../../services/bookingService';
+import { paymentService } from '../../services/paymentService';
+import { adminService } from '../../services/adminService';
 import BookingCalendar from '../../components/bookings/BookingCalendar';
 import LoadingSpinner from '../../components/ui/LoadingSpinner';
 import Button from '../../components/ui/Button';
@@ -105,14 +107,45 @@ const ModifyBookingPage = () => {
       const normalizedStart = normalizeTimeHM(startTime) || startTime;
       const normalizedEnd = normalizeTimeHM(endTime) || endTime;
 
-      const newBooking = await bookingService.createBooking({
+      // Calculate original and new duration
+      const originalDuration = booking.duration_hours || 1;
+      const newDuration = duration;
+      const hourlyRate = booking.hourly_rate || 400;
+      
+      // Calculate amounts
+      const originalAmount = safeNumber(booking.total_amount);
+      const newAmount = newDuration * hourlyRate;
+      const amountPaid = booking.payment_status === 'paid' ? originalAmount : 0;
+      
+      // Payment adjustment: positive = user owes more, negative = refund/credit due
+      const paymentAdjustment = newAmount - amountPaid;
+      
+      // Determine if original booking was paid
+      const wasOriginalPaid = booking.payment_status === 'paid';
+      
+      // Build the create booking request with payment carryover info
+      const createRequest: any = {
         field_id: booking.field_id,
         booking_date: toLocalDateInputValue(date),
         start_time: normalizedStart,
         end_time: normalizedEnd,
-        duration_hours: duration,
+        duration_hours: newDuration,
         notes: notes || undefined,
-      });
+      };
+      
+      // Add payment carryover fields if original was paid
+      if (wasOriginalPaid) {
+        createRequest.original_booking_id = booking.id;
+        createRequest.original_booking_reference = booking.booking_reference;
+        createRequest.original_total_amount = originalAmount;
+        createRequest.original_payment_status = booking.payment_status;
+        createRequest.original_duration_hours = originalDuration;
+        createRequest.carry_over_payment = true;
+        createRequest.amount_paid = amountPaid;
+        createRequest.payment_adjustment = paymentAdjustment;
+      }
+
+      const newBooking = await bookingService.createBooking(createRequest);
 
       let cancelFailed = false;
       let cancelErrorMessage: string | undefined;
@@ -127,10 +160,53 @@ const ModifyBookingPage = () => {
         }
       }
 
-      return { newBooking, cancelFailed, cancelErrorMessage };
+      // Handle payment status for the new booking based on duration change
+      let paymentConfirmed = false;
+      let paymentMessage = '';
+      
+      if (wasOriginalPaid && newBooking?.id) {
+        try {
+          if (newDuration === originalDuration) {
+            // Same duration: Confirm payment and set status to confirmed
+            await paymentService.confirmPayment(undefined, newBooking.id);
+            await adminService.updateBookingStatus({ 
+              booking_id: newBooking.id, 
+              status: 'confirmed' 
+            });
+            paymentConfirmed = true;
+            paymentMessage = 'Payment transferred from original booking.';
+          } else if (newDuration < originalDuration) {
+            // Shorter duration: Confirm payment (credit/refund will be due)
+            await paymentService.confirmPayment(undefined, newBooking.id);
+            await adminService.updateBookingStatus({ 
+              booking_id: newBooking.id, 
+              status: 'confirmed' 
+            });
+            paymentConfirmed = true;
+            const refundAmount = amountPaid - newAmount;
+            paymentMessage = `Payment confirmed. Credit of R${refundAmount.toFixed(2)} is due to you.`;
+          } else {
+            // Longer duration: Still pending, but partial payment applied
+            const pendingAmount = newAmount - amountPaid;
+            paymentMessage = `Partial payment of R${amountPaid.toFixed(2)} applied. Remaining balance: R${pendingAmount.toFixed(2)}.`;
+          }
+        } catch (paymentError: any) {
+          console.warn('Failed to update payment status for new booking:', paymentError);
+          paymentMessage = 'Note: Please verify payment status manually.';
+        }
+      }
+
+      return { 
+        newBooking, 
+        cancelFailed, 
+        cancelErrorMessage, 
+        paymentConfirmed, 
+        paymentMessage,
+        wasOriginalPaid
+      };
     },
     {
-      onSuccess: ({ newBooking, cancelFailed, cancelErrorMessage }) => {
+      onSuccess: ({ newBooking, cancelFailed, cancelErrorMessage, paymentConfirmed, paymentMessage, wasOriginalPaid }) => {
         if (cancelFailed) {
           toast.success('New booking created, but please cancel the original booking manually.');
           if (cancelErrorMessage) {
@@ -139,6 +215,16 @@ const ModifyBookingPage = () => {
         } else {
           toast.success('New booking created and original booking archived as cancelled.');
         }
+        
+        // Show payment status message
+        if (wasOriginalPaid && paymentMessage) {
+          if (paymentConfirmed) {
+            toast.success(paymentMessage);
+          } else {
+            toast(paymentMessage, { duration: 5000, icon: 'ℹ️' });
+          }
+        }
+        
         qc.invalidateQueries(['bookings']);
         qc.invalidateQueries(['booking', bookingId]);
         if (newBooking?.id) {
@@ -357,7 +443,14 @@ const ModifyBookingPage = () => {
                 <div><span className="font-medium">Field:</span> {booking.field_name || 'Unknown Field'}</div>
                 <div><span className="font-medium">Date:</span> {booking.booking_date || '—'}</div>
                 <div><span className="font-medium">Time:</span> {booking.start_time || '—'} - {booking.end_time || '—'}</div>
+                <div><span className="font-medium">Duration:</span> {booking.duration_hours || 1}h</div>
                 <div><span className="font-medium">Amount:</span> R{safeNumber(booking.total_amount).toFixed(2)}</div>
+                <div>
+                  <span className="font-medium">Payment:</span>{' '}
+                  <span className={`${booking.payment_status === 'paid' ? 'text-green-600 font-semibold' : 'text-amber-600'}`}>
+                    {booking.payment_status === 'paid' ? '✓ PAID' : 'PENDING'}
+                  </span>
+                </div>
               </div>
             </div>
             <div className="space-y-3">
@@ -371,6 +464,41 @@ const ModifyBookingPage = () => {
               </div>
             </div>
           </div>
+          
+          {/* Payment Carryover Information */}
+          {booking.payment_status === 'paid' && startTime && (
+            <div className="mt-4 p-3 rounded-lg border-2 border-dashed bg-gray-50">
+              <h3 className="text-sm font-medium text-gray-700 mb-2">💳 Payment Adjustment</h3>
+              {(() => {
+                const originalDuration = booking.duration_hours || 1;
+                const originalAmount = safeNumber(booking.total_amount);
+                const newAmount = safeNumber(cost);
+                
+                if (duration === originalDuration) {
+                  return (
+                    <div className="text-sm text-green-700 bg-green-50 p-2 rounded">
+                      <span className="font-medium">✓ Same duration:</span> Your payment of R{originalAmount.toFixed(2)} will be transferred to the new booking. Status will be <span className="font-semibold">PAID & CONFIRMED</span>.
+                    </div>
+                  );
+                } else if (duration < originalDuration) {
+                  const credit = originalAmount - newAmount;
+                  return (
+                    <div className="text-sm text-blue-700 bg-blue-50 p-2 rounded">
+                      <span className="font-medium">↓ Shorter duration:</span> Credit of <span className="font-semibold">R{credit.toFixed(2)}</span> will be due to you. New booking will be <span className="font-semibold">PAID & CONFIRMED</span>.
+                    </div>
+                  );
+                } else {
+                  const pending = newAmount - originalAmount;
+                  return (
+                    <div className="text-sm text-amber-700 bg-amber-50 p-2 rounded">
+                      <span className="font-medium">↑ Longer duration:</span> Your payment of R{originalAmount.toFixed(2)} will be applied. Additional <span className="font-semibold">R{pending.toFixed(2)}</span> pending payment required.
+                    </div>
+                  );
+                }
+              })()}
+            </div>
+          )}
+          
           <div className="mt-6 flex flex-col sm:flex-row gap-3">
             <Button
               variant="outline"
