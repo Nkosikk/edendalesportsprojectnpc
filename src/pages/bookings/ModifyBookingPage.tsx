@@ -107,10 +107,10 @@ const ModifyBookingPage = () => {
       const normalizedStart = normalizeTimeHM(startTime) || startTime;
       const normalizedEnd = normalizeTimeHM(endTime) || endTime;
 
-      // Calculate original and new duration
-      const originalDuration = booking.duration_hours || 1;
-      const newDuration = duration;
-      const hourlyRate = booking.hourly_rate || 400;
+      // Calculate original and new duration (ensure integer comparison)
+      const originalDuration = Math.round(safeNumber(booking.duration_hours) || 1);
+      const newDuration = Math.round(duration);
+      const hourlyRate = safeNumber(booking.hourly_rate) || 400;
       
       // Calculate amounts
       const originalAmount = safeNumber(booking.total_amount);
@@ -470,17 +470,18 @@ const ModifyBookingPage = () => {
             <div className="mt-4 p-3 rounded-lg border-2 border-dashed bg-gray-50">
               <h3 className="text-sm font-medium text-gray-700 mb-2">💳 Payment Adjustment</h3>
               {(() => {
-                const originalDuration = booking.duration_hours || 1;
+                const originalDuration = Math.round(safeNumber(booking.duration_hours) || 1);
+                const newDuration = Math.round(duration);
                 const originalAmount = safeNumber(booking.total_amount);
                 const newAmount = safeNumber(cost);
                 
-                if (duration === originalDuration) {
+                if (newDuration === originalDuration) {
                   return (
                     <div className="text-sm text-green-700 bg-green-50 p-2 rounded">
                       <span className="font-medium">✓ Same duration:</span> Your payment of R{originalAmount.toFixed(2)} will be transferred to the new booking. Status will be <span className="font-semibold">PAID & CONFIRMED</span>.
                     </div>
                   );
-                } else if (duration < originalDuration) {
+                } else if (newDuration < originalDuration) {
                   const credit = originalAmount - newAmount;
                   return (
                     <div className="text-sm text-blue-700 bg-blue-50 p-2 rounded">
