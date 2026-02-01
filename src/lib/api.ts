@@ -7,10 +7,10 @@ import toast from 'react-hot-toast';
 // ============================================
 
 // PRODUCTION - Edendale Sports (use when deploying to edendalesports.co.za)
-const API_BASE_URL = 'https://www.edendalesports.co.za/EDENDALESPORTSPROJECTNPC/api';
+// const API_BASE_URL = 'https://www.edendalesports.co.za/EDENDALESPORTSPROJECTNPC/api';
 
 // DEVELOPMENT/VERCEL - Ndosi Automation (use for Vercel staging, direct access)
-// const API_BASE_URL = 'https://www.ndosiautomation.co.za/EDENDALESPORTSPROJECTNPC/api';
+const API_BASE_URL = 'https://www.ndosiautomation.co.za/EDENDALESPORTSPROJECTNPC/api';
 
 // LOCAL PROXY - (use with npm run dev to avoid CORS) - Currently pointing to DEV
 // const API_BASE_URL = '/api';
