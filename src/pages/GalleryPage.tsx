@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play, X, ChevronLeft, ChevronRight, Image as ImageIcon } from 'lucide-react';
+import { Play, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface MediaItem {
   id: number;
