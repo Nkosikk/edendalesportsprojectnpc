@@ -59,7 +59,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     toast.success('Logged out successfully');
     // Redirect to login without saving current location
     // This ensures next login goes to dashboard, not back to the previous page
-    window.location.href = '/login';
+    // Using hash for cPanel compatibility
+    window.location.href = '/#/login';
   }, []);
 
   // Handle inactivity logout with automatic redirect
@@ -78,8 +79,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
     warningShownRef.current = false;
     toast.error('Session expired due to inactivity. Please log in again.', { duration: 5000 });
-    // Automatically redirect to login page
-    window.location.href = '/login';
+    // Automatically redirect to login page (using hash for cPanel compatibility)
+    window.location.href = '/#/login';
   }, []);
 
   // Reset inactivity timer on user activity

@@ -75,8 +75,8 @@ apiClient.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      // Redirect to login for general 401s
-      window.location.href = '/login';
+      // Redirect to login for general 401s (using hash for cPanel compatibility)
+      window.location.href = '/#/login';
       return Promise.reject(error);
     }
 
