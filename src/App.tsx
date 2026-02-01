@@ -29,6 +29,7 @@ import ReportsAnalyticsPage from './pages/admin/ReportsAnalyticsPage'
 import BookingOverviewPage from './pages/admin/BookingOverviewPage'
 import InvoicePage from './pages/invoices/InvoicePage'
 import CommunicationPage from './pages/admin/CommunicationPage'
+import GalleryPage from './pages/GalleryPage'
 
 function App() {
   const { loading } = useAuth()
@@ -46,6 +47,7 @@ function App() {
       {/* Public Routes */}
       <Route path="/" element={<Layout />}>
         <Route index element={<HomePage />} />
+        <Route path="gallery" element={<GalleryPage />} />
         <Route path="login" element={<LoginPage />} />
         <Route path="register" element={<RegisterPage />} />
         <Route path="forgot-password" element={<ForgotPasswordPage />} />

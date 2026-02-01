@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, User, LogOut, Settings, Calendar, Home, Users, Building, BarChart3, FileText, Megaphone } from 'lucide-react';
+import { Menu, X, User, LogOut, Settings, Calendar, Home, Users, Building, BarChart3, FileText, Megaphone, Image } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import Button from '../ui/Button';
 import LogoImg from '../../assets/images/ESP-BLUE-2.png';
@@ -20,6 +20,10 @@ const Header = () => {
     navigate('/');
     setIsProfileOpen(false);
   };
+
+  const publicNavigation = [
+    { name: 'Fields Gallery', href: '/gallery', icon: Image },
+  ];
 
   const navigation = isAuthenticated ? [
     { name: 'Dashboard', href: '/app', icon: Home },
@@ -95,6 +99,22 @@ const Header = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex space-x-8">
+            {/* Public navigation - always visible */}
+            {publicNavigation.map((item) => (
+              <Link
+                key={item.name}
+                to={item.href}
+                className={`inline-flex items-center px-1 pt-1 text-sm font-medium transition-colors ${
+                  location.pathname === item.href
+                    ? 'text-primary-600 border-b-2 border-primary-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <item.icon className="h-4 w-4 mr-2" />
+                {item.name}
+              </Link>
+            ))}
+            {/* Authenticated navigation */}
             {navigation.map((item) => (
               <Link
                 key={item.name}
@@ -226,6 +246,23 @@ const Header = () => {
         {isMenuOpen && (
           <div className="md:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+              {/* Public navigation - always visible */}
+              {publicNavigation.map((item) => (
+                <Link
+                  key={item.name}
+                  to={item.href}
+                  className={`flex items-center px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                    location.pathname === item.href
+                      ? 'text-primary-600 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <item.icon className="h-5 w-5 mr-3" />
+                  {item.name}
+                </Link>
+              ))}
+              {/* Authenticated navigation */}
               {navigation.map((item) => (
                 <Link
                   key={item.name}

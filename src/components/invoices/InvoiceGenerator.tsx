@@ -35,8 +35,8 @@ const InvoiceGenerator: React.FC<InvoiceGeneratorProps> = ({
   const defaultCompanyInfo = {
     name: 'Edendale Sports Complex',
     address: '123 Sports Avenue, Edendale, Pietermaritzburg, 3201',
-    phone: '+27 33 123 4567',
-    email: 'bookings@edendalesports.co.za',
+    phone: '065 883 4116',
+    email: 'admin@edendalesports.co.za',
     website: 'www.edendalesports.co.za',
     ...companyInfo
   };

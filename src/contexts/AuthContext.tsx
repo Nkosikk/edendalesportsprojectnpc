@@ -182,8 +182,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         try {
           const userData = JSON.parse(storedUser);
           setUser(userData);
-          // Optionally verify token is still valid
-          await apiClient.get('/auth/verify');
+          // Skip token verification for now since backend might not be running
+          // TODO: Re-enable when backend is available
+          // await apiClient.get('/auth/verify');
         } catch (error) {
           // Token invalid, clear storage and user state
           localStorage.removeItem('user');

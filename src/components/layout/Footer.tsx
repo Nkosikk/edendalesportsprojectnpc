@@ -28,8 +28,8 @@ const Footer = () => {
           <div>
             <h3 className="font-semibold mb-2 text-xs">Contact</h3>
             <ul className="space-y-1 text-xs text-gray-400">
-              <li>Email: info@edendalesports.co.za</li>
-              <li>Phone: +27 (0)31 123 4567</li>
+              <li>Email: admin@edendalesports.co.za</li>
+              <li>Phone: 065 883 4116</li>
               <li>Edendale, KwaZulu-Natal</li>
             </ul>
           </div>
